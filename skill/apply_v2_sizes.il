@@ -1,0 +1,46 @@
+;; apply_v2_sizes.il — 把 08 第二版尺寸写回 port_pilot/OPA_D/schematic
+(printf "\n=== APPLY V2 START\n")
+(let (cv inst)
+  (setq cv (dbOpenCellViewByType "port_pilot" "OPA_D" "schematic" "schematic" "a"))
+  (if (null cv)
+      (printf "ERROR: 打不开 schematic\n")
+      (progn
+        ;; name w l fingers
+        (foreach row (list
+                      (list "M1" "244.2u" "0.5u" 1)
+                      (list "M2" "244.2u" "0.5u" 1)
+                      (list "M3" "3.87u" "1.0u" 1)
+                      (list "M4" "3.87u" "1.0u" 1)
+                      (list "M5" "15.77u" "0.5u" 1)
+                      (list "M6" "42.9u" "1.0u" 1)
+                      (list "M7" "87.43u" "0.5u" 5)
+                      (list "M8" "15.77u" "0.5u" 1))
+          (setq inst nil)
+          (foreach i cv~>instances
+            (when (equal i~>name (car row)) (setq inst i))
+          )
+          (when inst
+            (dbReplaceProp inst "w" 'string (cadr row))
+            (dbReplaceProp inst "l" 'string (caddr row))
+            (dbReplaceProp inst "fingers" 'string (sprintf nil "%d" (cadddr row)))
+            (dbReplaceProp inst "m" 'string "1")
+            (printf "set %s w=%s l=%s fingers=%d\n" (car row) (cadr row) (caddr row) (cadddr row))
+          )
+        )
+        ;; 补偿网络
+        (foreach i cv~>instances
+          (when (equal i~>name "Rz")
+            (dbReplaceProp i "r" 'string "2.5K")
+            (printf "set Rz r=2.5K\n"))
+          (when (equal i~>name "C0")
+            (dbReplaceProp i "c" 'string "1.8p")
+            (printf "set C0 c=1.8p\n"))
+        )
+        (schCheck cv)
+        (dbSave cv)
+        (printf "saved port_pilot/OPA_D\n")
+      )
+  )
+)
+(printf "=== APPLY V2 DONE\n")
+(exit)

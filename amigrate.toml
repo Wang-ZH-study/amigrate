@@ -1,0 +1,34 @@
+# 迁移工程文件（amigrate 使用）
+# 2026-11-26
+
+[project]
+design = "OPA_D"
+source_pdk = "smic18ee_2P6M_20100810"
+target_pdk = "PDK_13mmrf_1P6M_30k"
+target_devices = "n33/p33 (3.3V IO @ 1.8V)"
+vdd_v = 1.8
+cload_pf = 5.0
+
+[paths]
+workspace = "."
+runs = "runs"
+spec = "specs/migration-spec.toml"
+lut_source = "runs/2026-11-25-lut-build/smic18ee/lut_smic18ee.csv"
+lut_target = "runs/2026-11-25-lut-build/13mmrf_io18/lut_13mmrf_io18.csv"
+sizing = "runs/2026-11-25-io18-ac/target-result.json"
+pv_result = "runs/2026-11-25-pvt/pvt.csv"
+mc_result = "runs/2026-11-26-mc/mc.csv"
+report = "docs/reports/verification-2026-11-26.md"
+
+[targets]
+gain_db_min = 60.0
+ugf_mhz_min = 10.0
+pm_deg_min = 60.0
+srp_vus_min = 10.0
+srm_vus_min = 10.0
+power_uw_max = 1000.0
+
+[vm]
+ssh_host = "ic618"
+spectre = "/opt/eda/cadence/SPECTRE181/bin/spectre"
+pdk_root = "/home/IC/Tech"

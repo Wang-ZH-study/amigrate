@@ -1,0 +1,164 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
+<title>迁移版 LUT 进度</title>
+<style>
+:root{--ink:#1b2233;--muted:#5b6478;--line:#dfe4ee;--ok:#0f9d58;--bg:#f7f8fb;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:20px}h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+h2{font-size:14.5px;margin:0 0 10px;color:#2a3348}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:600}
+.ok{color:var(--ok);font-weight:600}.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid}
+.pill.done{color:var(--ok);border-color:#bfe3cf;background:#f0fbf4}
+.pill.wait{color:var(--muted);border-color:var(--line);background:#fafbfd}
+ul{margin:6px 0 0 18px;padding:0}li{margin:3px 0}
+code{background:#f1f3f8;padding:1px 5px;border-radius:4px;font-size:12px}
+.note{color:var(--muted);font-size:12px}
+</style></head><body><div class="wrap">
+<h1>迁移版 LUT 进度</h1>
+<div class="sub">自动刷新（5 s）· 最后更新 2026-11-25 17:45 · 目标：为源/目标 PDK 各建一张迁移版器件表</div>
+
+<div class="card"><h2>当前状态：✅ 05.3 / 05.4 完成（两张表已建好并通过 schema 校验）</h2>
+<table>
+<tr><th>PDK</th><th>切片</th><th>行数</th><th>非饱和行</th><th>校验</th></tr>
+<tr><td>smic18ee（源，180nm）</td><td>360/360</td><td>32,760</td><td>17,594</td><td class="ok">✅ 通过</td></tr>
+<tr><td>PDK_13mmrf（目标，130nm）</td><td>360/360</td><td>24,120</td><td>13,150</td><td class="ok">✅ 通过（--skip-grid）</td></tr>
+</table>
+<p class="note">保真度：与上游 <code>gmid_table.csv</code> 的 15,166 个公共点逐点比，id/gm/vth/gmId 最大相对误差 <b>5e-9</b>（等价逐点复现）。</p>
+</div>
+
+<div class="card"><h2>05 号工单整体</h2>
+<table>
+<tr><th>子任务</th><th>状态</th><th>作用</th></tr>
+<tr><td>05.1 schema + 校验器</td><td><span class="pill done">完成</span></td><td>定义表结构，拦截不合格表</td></tr>
+<tr><td>05.5 反解器</td><td><span class="pill done">完成</span></td><td>源工作点 → 目标 (L,W)，selftest 5/5</td></tr>
+<tr><td>05.6 表级自洽回归</td><td><span class="pill done">完成</span></td><td>8/8 管 W 误差 ≤5%</td></tr>
+<tr><td>LUT × Spectre 点抽样</td><td><span class="pill done">完成</span></td><td>表物理正确 + 反解→SPICE 闭环</td></tr>
+<tr><td>05.3 扫描台改造</td><td><span class="pill done">完成 v1</span></td><td>双 PDK deck 生成 / 并行仿真 / 解析 / 全区域</td></tr>
+<tr><td>05.4 建两张表</td><td><span class="pill done">完成</span></td><td>18ee 32,760 行 / 13mmrf 24,120 行</td></tr>
+<tr><td>05.2 档位与供电方案</td><td><span class="pill wait">待做</span></td><td>决定 core/IO 与 VDD</td></tr>
+<tr><td>05.7 可行性判据</td><td><span class="pill wait">待做</span></td><td>逐管 F0–F4 + 报告</td></tr>
+</table></div>
+
+<div class="card"><h2>新增列的诚实标注（v1 边界）</h2>
+<table>
+<tr><th>列</th><th>来源</th><th>状态</th></tr>
+<tr><td><code>inoise_10k</code></td><td>推导：热噪声 sqrt(4kTγ/gm)，γ=2/3</td><td>有值，derived</td></tr>
+<tr><td><code>inoise_1hz</code></td><td>推导：100×inoise_10k（1/f 斜率近似）</td><td>有值，derived</td></tr>
+<tr><td><code>avt</code></td><td>13mmrf 有 atox/axl；18ee 未暴露</td><td>0 / pending，<b>不得当真实失配用</b></td></tr>
+<tr><td><code>Cgg/Cgd/Cdb_per_W</code></td><td>Spectre oppoint ÷ W（fF/µm）</td><td>与上游一致</td></tr>
+<tr><td><code>is_sat</code></td><td>region==2 派生</td><td>✅</td></tr>
+</table>
+<p class="note">v1 表可跑反解 / 可行性 / 尺寸初值；<b>不能</b>用于 PVT/良率结论——噪声与失配仍是推导值。</p>
+</div>
+
+<div class="card"><h2>证据</h2><ul>
+<li><code>runs/2026-11-25-lut-build/README.md</code>（构建说明 + 对照）</li>
+<li><code>runs/2026-11-25-lut-build/smic18ee/lut_smic18ee.csv</code></li>
+<li><code>runs/2026-11-25-lut-build/13mmrf/lut_13mmrf.csv</code></li>
+<li><code>runs/2026-11-25-lut-spotcheck/</code>（A/B 档独立验证）</li>
+<li><code>runs/2026-11-25-lut-selfcheck/</code>（05.6 自洽回归）</li>
+</ul></div>
+
+<div class="card"><h2>下一步</h2><ul>
+<li><b>05.2</b>：13mmrf 档位（n12/p12 vs n33/p33）与供电方案；</li>
+<li><b>05.7</b>：用两张表对 OPA_D 的 8 个管子跑 F0–F4，出可行性结论；</li>
+<li>之后 07 网表映射器、08 重定尺寸。</li>
+</ul></div>
+<div class="card"><h2>05.7 可行性判定（1.8V IO 器件，2026-11-25 20:10）</h2>
+<table>
+<tr><th>结论</th><th>数量</th><th>说明</th></tr>
+<tr><td class="ok">可行</td><td>5</td><td>M1/M2/M5/M7/M8（5mV 网格后 F4 全部通过）</td></tr>
+<tr><td>有条件可行</td><td>3</td><td>M3/M4/M6 有增益风险（residual 0.78，self_gain 约差 2.2×），需 08 重定尺寸</td></tr>
+<tr><td class="bad">不可行</td><td>0</td><td>无硬失败（F1/F3 全过）</td></tr>
+</table>
+<p class="note">F4 分辨率差 = 表 Vgs 步长 20 mV 造成的 gm 估计误差 &gt; 5% 容差；n 管增益风险 = 同 L 下 self_gain 差约 2.2×，需 08 重定尺寸/改 L。证据：<code>runs/2026-11-25-feasibility-io18/</code></p>
+</div>
+<div class="card"><h2>AC 增益验证（n33/p33 @1.8V，2026-11-25 20:45）</h2>
+<table>
+<tr><th>设计</th><th>DC 增益</th><th>UGF</th><th>PM</th></tr>
+<tr><td>源（smic18ee，上游尺寸）</td><td>76.68 dB</td><td>29.2 MHz</td><td>51.3°</td></tr>
+<tr><td><b>目标（n33/p33，我们的尺寸）</b></td><td class="bad"><b>61.78 dB</b></td><td>15.5 MHz</td><td>75.4°</td></tr>
+</table>
+<p class="note">缺口 14.9 dB ≈ n33 本征增益 2.2×（单级 6.8dB × 两级）。源设计测出 76.68dB 与上游目标吻合 → 测试台可信。下一步 08：加大 M3/M4/M6 的 L 补增益。证据：<code>runs/2026-11-25-io18-ac/</code></p>
+</div>
+<div class="card"><h2>n 管 L 扫描（08 预研，2026-11-25 20:55）</h2>
+<table>
+<tr><th>n 管 L</th><th>DC 增益</th><th>UGF</th><th>PM</th></tr>
+<tr><td>源设计</td><td>76.68 dB</td><td>29.2 MHz</td><td>51.3°</td></tr>
+<tr><td>0.5 µm</td><td>61.79 dB</td><td>15.6 MHz</td><td>75.5°</td></tr>
+<tr><td>0.7 µm</td><td>71.68 dB</td><td>15.7 MHz</td><td>74.5°</td></tr>
+<tr><td><b>1.0 µm（推荐）</b></td><td class="ok"><b>78.74 dB</b></td><td>15.7 MHz</td><td>72.8°</td></tr>
+<tr><td>1.5 µm</td><td>81.67 dB</td><td>15.3 MHz</td><td>68.9°</td></tr>
+</table>
+<p class="note">L=1.0µm 已超过源设计增益；UGF 不随 L 变 → 瓶颈在偏置电流（M5/M8 与上游差异），下一步 08 调偏置拉带宽。证据：<code>runs/2026-11-25-io18-ac/sweep/</code></p>
+</div>
+<div class="card"><h2>OPA_D 参数测量（n-L=1.0µm 版，2026-11-25 21:05）</h2>
+<table>
+<tr><th>参数</th><th>值</th><th>判读</th></tr>
+<tr><td>静态功耗</td><td>0.570 mW（317µA）</td><td>偏高</td></tr>
+<tr><td>压摆率 SR</td><td class="bad">13.8 V/µs</td><td>偏低（尾电流 ≈12µA）</td></tr>
+<tr><td>输入共模/输出摆幅</td><td>0.12–1.64 V</td><td>需开环复核</td></tr>
+<tr><td>THD @1kHz 0.3V</td><td>0.041%</td><td>低频线性度 OK</td></tr>
+<tr><td>PSRR @DC</td><td class="bad">-25.1 dB</td><td>电源增益 18×，差（拓扑固有）</td></tr>
+</table>
+<p class="note">结论：增益已达标（78.7dB），但偏置失衡（M8/M5 小、M7 大）→ SR/UGF 低、功耗高。08 下一步重分配偏置。证据：<code>runs/2026-11-25-io18-ac/meas/</code></p>
+</div>
+<div class="card"><h2>最低目标验收：6/6 全部通过（2026-11-25 21:20）</h2>
+<table>
+<tr><th>指标</th><th>最低目标</th><th>实测（n-L=1.0µm）</th><th>判定</th></tr>
+<tr><td>直流增益</td><td>≥60 dB</td><td>78.74 dB</td><td class="ok">✅</td></tr>
+<tr><td>UGF</td><td>≥10 MHz</td><td>15.7 MHz</td><td class="ok">✅</td></tr>
+<tr><td>相位裕度</td><td>≥60°</td><td>72.8°</td><td class="ok">✅</td></tr>
+<tr><td>SR+</td><td>≥10 V/µs</td><td>33.2 V/µs</td><td class="ok">✅</td></tr>
+<tr><td>SR−</td><td>≥10 V/µs</td><td>46.6 V/µs</td><td class="ok">✅</td></tr>
+<tr><td>功耗</td><td>≤1 mW</td><td>570 µW</td><td class="ok">✅</td></tr>
+</table>
+<p class="note">判卷：<code>check_spec.py --judge-abs</code> 退出码 0。源基线对照：增益 +2.1dB、SR+ +99%、PM +21.5°；UGF −46%（仍满足 ≥10MHz）。未覆盖：PVT 角集/蒙卡/offset/CMRR/noise（交 09）。</p>
+</div>
+<div class="card"><h2>吉尔伯特乘法器可行性（2026-11-25 21:30）</h2>
+<table>
+<tr><th>项</th><th>判断</th></tr>
+<tr><td>1.8V 头寸</td><td class="warn">可行但紧：三层叠 ≈0.95V 静态，剩 ~0.85V 给摆幅</td></tr>
+<tr><td>输入范围</td><td>受 tanh 线性区限制，建议 ±0.2–0.3V 差分（非 AD633 的 10V）</td></tr>
+<tr><td>输出</td><td>建议先差分；单端需多一级 → 再占头寸</td></tr>
+<tr><td>失配/精度</td><td class="bad">前置未完成：avt/蒙卡还没补</td></tr>
+<tr><td>LUT 可用性</td><td class="bad">缺口：Vsb 只扫到 0.4V，叠层器件需扩到 1.2V</td></tr>
+</table>
+<p class="note">结论：可行（有条件）。动手前两件事：扩 Vsb 网格、补失配/蒙卡；规格待确认（供电/输入范围/输出形式/带宽/线性度）。详见 <code>docs/porting/gilbert-multiplier-feasibility.md</code>、工单 11。</p>
+</div>
+<div class="card"><h2>PVT 45 点：已就绪，等 VM（2026-11-25 21:50）</h2>
+<table>
+<tr><th>项</th><th>状态</th></tr>
+<tr><td>网表生成</td><td class="ok">✅ 90 个（45 工况 × ac/buf）</td></tr>
+<tr><td>运行脚本（含 corner 探测）</td><td class="ok">✅ runs/2026-11-25-pvt/run_pvt.sh</td></tr>
+<tr><td>解析/汇总（pvt.csv + 最坏情况）</td><td class="ok">✅ tools/pvt_sweep.py --parse</td></tr>
+<tr><td>执行</td><td class="bad">❌ 阻塞：VM 192.168.233.128 SSH 超时（连试 4 次）</td></tr>
+</table>
+<p class="note">VM 开机后：scp nets/* 与 run_pvt.sh 到 /tmp/pvt → bash /tmp/pvt/run_pvt.sh → python tools/pvt_sweep.py --parse，约 1–2 分钟。corner section 名（tt/ff/ss/fnsp/snfp）待 VM 恢复后核对。</p>
+</div>
+<div class="card"><h2>PVT 45 点：45/45 全部通过（2026-11-26 13:20）</h2>
+<table>
+<tr><th>指标</th><th>最坏值</th><th>最低目标</th><th>判定</th></tr>
+<tr><td>增益</td><td>78.30 dB</td><td>≥60</td><td class="ok">✅</td></tr>
+<tr><td>UGF</td><td>10.97 MHz（ss/1.62V/-40°C）</td><td>≥10</td><td class="ok">✅</td></tr>
+<tr><td>相位裕度</td><td>63.06°</td><td>≥60</td><td class="ok">✅</td></tr>
+<tr><td>SR+ / SR−</td><td>14.10 / 29.90 V/µs</td><td>≥10</td><td class="ok">✅</td></tr>
+<tr><td>功耗</td><td>840.6 µW</td><td>≤1mW</td><td class="ok">✅</td></tr>
+</table>
+<p class="note">首轮 8/45 因输入对 gm 不足 UGF 不达标（最坏 2.26MHz）→ 08 第二版：输入对 W×32（7.63→244.2µm）+ Cc 1.8p + Rz 2.5k → 复扫全过。标称 82.42dB / 31.59MHz / 70.91° / 607.7µW。证据：<code>runs/2026-11-25-pvt/</code></p>
+</div>
+<div class="card"><h2>失配表 + 汇报 PPT（2026-11-26 13:40）</h2>
+<table>
+<tr><th>项</th><th>内容</th></tr>
+<tr><td>失配模型</td><td>Avt 取自 PDK：n33 9.5、p33 3.5 mV·µm；σ(ΔVt)=Avt/√(WL)，3σ 容忍带（华为口径）</td></tr>
+<tr><td>入表</td><td class="ok">✅ 101,080 行全部 avt_src=model</td></tr>
+<tr><td>最敏感管</td><td>M3/M4：3σ gm 带 9.10%</td></tr>
+<tr><td>汇报 PPT</td><td class="ok">✅ docs/reports/migration-flow-2026-11-26.pptx（一页）</td></tr>
+</table>
+</div>
+</div></body></html>

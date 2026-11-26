@@ -1,0 +1,256 @@
+# 迁移版器件 LUT 的表结构（机器可读）
+#
+# 干什么：定义"迁移用器件查找表"必须有哪些列、网格长什么样、怎么校验。
+# 谁用：tools/check_lut.py（校验任何一张表）、tools/solve_lw.py（反解器按此读表）、
+#       工单 05.3/05.4（按此建表）。
+# 与设计用表的区别：设计用表（gmid_table.csv）只留饱和行、无噪声/失配；
+#       迁移用表保留全区域（另加 is_sat），并补噪声与 Pelgrom 失配列。
+#
+# 用法：
+#   python tools/check_lut.py --schema            # 只校验本 schema 自身
+#   python tools/check_lut.py --check <lut.csv>   # 校验某张表是否符合本 schema
+
+[meta]
+version = 1
+date = "2026-11-25"
+purpose = "迁移版器件 LUT：源/目标 PDK 用同一网格各扫一张，供反解器查表定 (Vgs, W)"
+# 网格的 W 归一化宽度：表里所有电流/电容按此宽度归一，反解时 W 由电流除回来
+normalization_w_um = 10.0
+# 与 specs/migration-spec.toml 的指标名对齐（check_lut 会交叉校验）
+spec_file = "specs/migration-spec.toml"
+
+[grid]
+# 器件类型
+dev = ["n", "p"]
+# 沟道长度（µm）。目标 PDK 最小 L 不同时，按目标 PDK 重定这张网格。
+L_um = [0.18, 0.22, 0.28, 0.36, 0.5, 0.7, 1.0, 1.5, 2.0]
+# 漏源电压（V）
+Vds_V = [0.2, 0.5, 0.9, 1.4]
+# 源衬偏置（V）
+Vsb_V = [0.0, 0.1, 0.2, 0.3, 0.4]
+# Vgs 扫描范围与步长（V）：按源 PDK 的供电定，目标 PDK 可单独生成网格文件
+Vgs_start_V = 0.0
+Vgs_stop_V = 1.8
+Vgs_step_V = 0.02
+
+[validation]
+# 每个 (dev, L, Vds, Vsb) 切片至少要有多少行
+min_rows_per_slice = 5
+# 必需数值列里允许的缺失比例（NaN/空值）
+max_nan_fraction = 0.02
+# 不允许重复的键
+unique_key = ["dev", "L", "Vds", "Vsb", "Vgs"]
+# 网格检查允许的相对误差（浮点比较）
+grid_rtol = 1e-3
+# 是否允许非饱和行（迁移版必须允许；设计版可以禁止）
+allow_non_sat = true
+
+# ---------------------------------------------------------------- 列定义
+# type: str | float | int | bool
+# required: true = 缺列即判失败；false = 可选（建表阶段可缺，但反解器会降级）
+
+[[columns]]
+name = "dev"
+type = "str"
+unit = ""
+required = true
+note = "n 或 p"
+
+[[columns]]
+name = "W"
+type = "float"
+unit = "m"
+required = true
+note = "归一化宽度，通常 = normalization_w_um（10 µm = 1e-5 m）"
+
+[[columns]]
+name = "L"
+type = "float"
+unit = "m"
+required = true
+
+[[columns]]
+name = "Vds"
+type = "float"
+unit = "V"
+required = true
+
+[[columns]]
+name = "Vsb"
+type = "float"
+unit = "V"
+required = true
+
+[[columns]]
+name = "Vgs"
+type = "float"
+unit = "V"
+required = true
+
+[[columns]]
+name = "id"
+type = "float"
+unit = "A"
+required = true
+
+[[columns]]
+name = "gm"
+type = "float"
+unit = "S"
+required = true
+
+[[columns]]
+name = "gds"
+type = "float"
+unit = "S"
+required = true
+
+[[columns]]
+name = "vth"
+type = "float"
+unit = "V"
+required = true
+
+[[columns]]
+name = "vdsat"
+type = "float"
+unit = "V"
+required = true
+
+[[columns]]
+name = "gmoverid"
+type = "float"
+unit = "1/V"
+required = true
+note = "gm/id，反解器的匹配量"
+
+[[columns]]
+name = "self_gain"
+type = "float"
+unit = ""
+required = true
+note = "gm/gds，线性值（不是 dB）"
+
+[[columns]]
+name = "region"
+type = "int"
+unit = ""
+required = true
+note = "Spectre region：0=截止 1=线性 2=饱和 3=亚阈 4=击穿"
+
+[[columns]]
+name = "vsat_marg"
+type = "float"
+unit = "V"
+required = true
+note = "Vds - Vdsat"
+
+[[columns]]
+name = "id_W_uAum"
+type = "float"
+unit = "uA/um"
+required = true
+note = "单位宽度电流密度，反解 W 的关键列"
+
+[[columns]]
+name = "gain_dB"
+type = "float"
+unit = "dB"
+required = true
+note = "self_gain 的 dB 形式"
+
+[[columns]]
+name = "Cgg_per_W"
+type = "float"
+unit = "fF/um"
+required = true
+
+[[columns]]
+name = "Cgd_per_W"
+type = "float"
+unit = "fF/um"
+required = true
+
+[[columns]]
+name = "Cdb_per_W"
+type = "float"
+unit = "fF/um"
+required = true
+
+# ---- 迁移必需的新增列 ----
+
+[[columns]]
+name = "inoise_1hz"
+type = "float"
+unit = "V/sqrt(Hz)"
+required = true
+note = "输入参考噪声 @1 Hz（闪烁噪声为主）；对应专利第一约束里的 fn"
+
+[[columns]]
+name = "inoise_10k"
+type = "float"
+unit = "V/sqrt(Hz)"
+required = true
+note = "输入参考噪声 @10 kHz（热噪声为主）；对应专利里的 tn"
+
+[[columns]]
+name = "noise_src"
+type = "str"
+unit = ""
+required = true
+note = "sim 或 derived；防止把推导值当实测值引用"
+
+[[columns]]
+name = "avt"
+type = "float"
+unit = "mV*um"
+# Pelgrom: sigma(dVt)=avt/sqrt(W*L)，W/L 用 µm；13mmrf: n33=9.5, p33=3.5
+required = true
+note = "Pelgrom 失配系数：sigma(dVt) = avt / sqrt(W*L)"
+
+[[columns]]
+name = "avt_src"
+type = "str"
+unit = ""
+required = true
+note = "model 或 mc_fit"
+
+[[columns]]
+name = "is_sat"
+type = "bool"
+unit = ""
+required = true
+note = "由 region 派生；迁移版不删非饱和行，由使用方筛选"
+
+# ---- 可选列（β 缩放系数；05.6 实测分辨率后再定）----
+
+[[columns]]
+name = "beta0_low"
+type = "float"
+unit = ""
+required = false
+
+[[columns]]
+name = "beta0_high"
+type = "float"
+unit = ""
+required = false
+
+[[columns]]
+name = "beta1_low"
+type = "float"
+unit = ""
+required = false
+
+[[columns]]
+name = "beta1_high"
+type = "float"
+unit = ""
+required = false
+
+# ---------------------------------------------------------------- 指标映射
+# LUT 列 → specs/migration-spec.toml 里的指标名（check_lut 交叉校验）
+[metric_map]
+inoise_1hz = "noise"
+inoise_10k = "noise"
+note = "噪声列对应 migration-spec 的 noise 指标；表里有列、spec 里没指标（或反之）时给出警告而不是硬失败。"

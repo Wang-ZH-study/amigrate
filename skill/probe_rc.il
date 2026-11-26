@@ -1,0 +1,30 @@
+;; probe_rc.il — 查 13mmrf 库里电阻/电容单元及 CDF 参数
+(printf "\n=== RC PROBE START\n")
+(let (lib)
+  (setq lib (ddGetObj "smic13mmrf_1233"))
+  (when lib
+    (printf "--- resistor-like cells\n")
+    (foreach c lib~>cells
+      (when (or (rexMatchp "^r" c~>name) (rexMatchp "res" c~>name)
+                (rexMatchp "rpo" c~>name) (rexMatchp "rpp" c~>name))
+        (printf "  %s\n" c~>name)))
+    (printf "--- cap-like cells\n")
+    (foreach c lib~>cells
+      (when (or (rexMatchp "mim" c~>name) (rexMatchp "cap" c~>name)
+                (rexMatchp "mom" c~>name))
+        (printf "  %s\n" c~>name)))
+  )
+)
+(procedure (probeCdf cellName)
+  (let (cdf)
+    (setq cdf (cdfGetBaseCellCDF (ddGetObj "smic13mmrf_1233" cellName)))
+    (printf "\n--- CDF smic13mmrf_1233/%s\n" cellName)
+    (if (null cdf)
+        (printf "  (no base CDF)\n")
+        (foreach p cdf~>parameters
+          (when (member p~>name (list "w" "l" "r" "segW" "segL" "rsh" "c" "m" "nf" "fingers"))
+            (printf "  %-10s type=%L default=%L\n" p~>name p~>type p~>defaultValue))))))
+(foreach n (list "primRes2" "primRes3" "rnpo" "rppo" "rhrpo" "mim2_tm" "mim1" "mim15" "mim3")
+  (when (ddGetObj "smic13mmrf_1233" n) (probeCdf n)))
+(printf "\n=== RC PROBE DONE\n")
+(exit)

@@ -1,0 +1,90 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
+<title>07B SKILL 原理图试点 · 进度</title>
+<style>
+:root{--ink:#1b2233;--muted:#5b6478;--line:#dfe4ee;--ok:#0f9d58;--bad:#d93025;--warn:#b26a00;--bg:#f7f8fb;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:20px}h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+h2{font-size:14.5px;margin:0 0 10px;color:#2a3348}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}.warn{color:var(--warn);font-weight:600}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid}
+.pill.done{color:var(--ok);border-color:#bfe3cf;background:#f0fbf4}
+.pill.run{color:var(--warn);border-color:#f0d6a8;background:#fff8ec}
+.pill.wait{color:var(--muted);border-color:var(--line);background:#fafbfd}
+ul,ol{margin:6px 0 0 18px;padding:0}li{margin:3px 0}
+code{background:#f1f3f8;padding:1px 5px;border-radius:4px;font-size:12px}
+.note{color:var(--muted);font-size:12px}
+</style></head><body><div class="wrap">
+<h1>07B SKILL 原理图试点 · 进度</h1>
+<div class="sub">自动刷新（5 s）· 最后更新 2026-11-25 20:45 · 05.7 复算 5 可行/3 有条件；**已切 n33/p33 并写入全部 8 管尺寸**</div>
+
+<div class="card"><h2>当前状态：<span class="ok">写入机制已打通</span>——换器件 8/8 + 写尺寸可落盘</h2>
+<table>
+<tr><th>阶段</th><th>状态</th><th>证据</th></tr>
+<tr><td>复制真实 OPA_D 到 port_pilot</td><td class="ok">✅</td><td>16 个实例，M1 master=smic18ee/p18e2r，w="9.27u" l="500n" fingers="2"</td></tr>
+<tr><td><b>跨 PDK 换器件（n+p）</b></td><td class="ok">✅ 8/8</td><td><code>convert changed=t，converted instances=8</code>；M1 → smic13mmrf_1233/p12，M3 → n12</td></tr>
+<tr><td><b>写尺寸（已验证落盘）</b></td><td class="ok">✅</td><td>M1 写 w="9u" l="500n" fingers="2" → 重开后仍 9u/500n/2</td></tr>
+<tr><td>写尺寸 API 结论</td><td class="ok">✅ 定位</td><td><code>dbSet</code> 静默失败；<code>dbReplaceProp inst "w" 'string "9u"</code> 有效</td></tr>
+<tr><td>apply_sizes 批量写入</td><td class="pill run">已改好待跑</td><td>已改用 dbReplaceProp + "%gu" 单位串</td></tr>
+<tr><td>导网表 + .op</td><td class="pill wait">⏳ 待做</td><td>下一步</td></tr>
+</table>
+</div>
+
+<div class="card"><h2>“卡在哪一步”的准确回答</h2>
+<table>
+<tr><th>层</th><th>能不能更新</th><th>说明</th></tr>
+<tr><td>数据层（LUT / 候选尺寸 / sizing 表）</td><td class="ok">✅ 能</td><td>两张迁移版表、8 管候选尺寸都已落盘</td></tr>
+<tr><td>原理图结构层（器件 master）</td><td class="ok">✅ 能</td><td>8/8 MOS 从 smic18ee 换成 smic13mmrf_1233，重开验证通过</td></tr>
+<tr><td><b>原理图参数层（W/L/fingers）</b></td><td class="ok">✅ 刚打通</td><td>之前卡住是因为用 <code>dbSet</code>；改用 <code>dbReplaceProp</code> 后 M1 写入并落盘成功</td></tr>
+<tr><td>网表 + 仿真</td><td class="pill wait">待做</td><td>批量写入后导出网表跑 .op</td></tr>
+</table>
+<p class="note"><b>所以不是"原理图无法更新"</b>：结构和参数都能更新，只是参数必须用对的 API（<code>dbReplaceProp</code> 而非 <code>dbSet</code>）。</p>
+</div>
+
+<div class="card"><h2>关键事实（CDF / 实例存法）</h2>
+<ul>
+<li>上游 OPA_D 实例存法：<code>w="9.27u" l="500n" fingers="2" m="1" fw="4.635u"</code>（w 是总宽，fw=w/fingers）</li>
+<li>13mmrf CDF 参数：<code>w、l、m、fingers、mismod</code>（没有 nf）</li>
+<li>13mmrf 档位：<code>n12/p12</code>（1.2V core）、<code>n33/p33</code>（3.3V IO）</li>
+<li><code>dbSet</code> 对这类 CDF 属性静默失败；<code>dbReplaceProp</code> 参数顺序是 <code>(inst 属性名 'string 值)</code></li>
+<li>换器件过程有 <code>PasCdfGetDpt</code> 报错噪声（pcell 默认值读取），不影响结果</li>
+</ul>
+</div>
+
+<div class="card"><h2>下一步</h2>
+<ol>
+<li>跑改好的 <code>apply_sizes.il</code>，把 8 管尺寸写进副本（CSV 仍可能受 SKILL 文件 I/O 限制，必要时用 Python 生成 alist 再 load）；</li>
+<li>给副本加测试台/连线（或直接导出网表，用现有测试台文件套），跑 <code>.op</code> 验证工作点；</li>
+<li>与 07A 的网表映射结果做 diff 对照；</li>
+<li>通过后接 8 管全量与 08 重定尺寸。</li>
+</ol>
+</div>
+
+<div class="card"><h2>供电方案（未变）</h2>
+<p><b>已决定：保 1.8V（方案 B）</b>：用 <b>n33/p33（3.3V IO）@1.8V</b>。已重扫 IO 表（<code>runs/2026-11-25-lut-build/13mmrf_io18/</code>）并重解尺寸（<code>runs/2026-11-25-solve-13mmrf-io18/</code>）；代价是 W 约 2.7×、n 管 self_gain 残差 0.78（需 08 重定）。</p>
+</div>
+
+<div class="card"><h2>证据</h2>
+<ul>
+<li><code>runs/2026-11-25-pdk-probe/pilot6.log</code>：8/8 换器件 + M1 写尺寸落盘</li>
+<li><code>runs/2026-11-25-pdk-probe/cdf_probe.log</code>：CDF 与实例存法</li>
+<li>脚本：<code>skill/pilot5_upstream_copy.il</code>、<code>pilot6_writeback.il</code>、<code>apply_sizes.il</code></li>
+</ul>
+</div>
+<div class="card"><h2>07B 切换器件完成（n33/p33，2026-11-25 20:35）</h2>
+<table>
+<tr><th>步骤</th><th>结果</th></tr>
+<tr><td>复制真实 OPA_D</td><td>16 实例</td></tr>
+<tr><td>换器件</td><td class="ok">8/8：M1/M2/M5/M7/M8 → p33；M3/M4/M6 → n33</td></tr>
+<tr><td>写尺寸（dbReplaceProp）</td><td class="ok">M1 7.63u、M3 1.84u、M6 20.42u(nf=2)、M7 87.43u(nf=5)…重开验证全部保留</td></tr>
+<tr><td>下一步</td><td>连线/导网表 → <code>.op</code> 验证；n 管增益风险交 08 重定</td></tr>
+</table>
+<p class="note">证据：<code>runs/2026-11-25-pdk-probe/pilot7.log</code>（convert changed=t、converted instances=8、write/reopen 全部一致）。</p>
+</div>
+</div></body></html>

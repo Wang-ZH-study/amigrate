@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>华为 CN116964587A 电路移植方法 —— 关系网络图</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --panel:#ffffff; --ink:#151a26; --muted:#5b6478; --line:#d9dee9;
+    --src:#2563eb; --cons:#7c3aed; --tgt:#0d9488; --ver:#ea580c;
+    --src-bg:#eff4ff; --cons-bg:#f6f1ff; --tgt-bg:#ecfaf7; --ver-bg:#fff4ec;
+    --shadow:0 1px 2px rgba(20,25,40,.06),0 8px 24px rgba(20,25,40,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1460px;margin:0 auto;padding:28px 22px 64px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px}
+  .kicker{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:27px;line-height:1.3;margin:8px 0 10px;letter-spacing:-.01em}
+  h1 small{font-weight:400;color:var(--muted);font-size:15px;letter-spacing:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .badge{font-size:12px;padding:3px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted)}
+  .badge.hot{border-color:#f0c6a8;background:#fff7f1;color:#b3491b}
+  .lede{margin:16px 0 0;color:#333c50;max-width:78ch}
+  .lede b{color:var(--ink)}
+
+  nav.jump{position:sticky;top:0;z-index:20;display:flex;gap:6px;flex-wrap:wrap;padding:10px 0;margin-bottom:18px;
+    background:rgba(246,247,251,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav.jump a{font-size:13px;padding:5px 11px;border-radius:7px;color:#37415a;text-decoration:none;border:1px solid transparent}
+  nav.jump a:hover{background:#fff;border-color:var(--line)}
+
+  section{margin:34px 0 0}
+  h2{font-size:19px;margin:0 0 6px;letter-spacing:-.01em}
+  h2 .num{display:inline-block;min-width:26px;color:var(--cons);font-variant-numeric:tabular-nums}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+
+  /* ---------- graph ---------- */
+  .graph-shell{display:grid;grid-template-columns:minmax(0,1fr) 306px;gap:16px;align-items:start}
+  @media (max-width:1180px){.graph-shell{grid-template-columns:1fr}}
+  .canvas-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 10px 6px;overflow:hidden}
+  .toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:2px 4px 8px}
+  .chip{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#414b62;cursor:pointer}
+  .chip:hover{border-color:#b9c2d6}
+  .chip[aria-pressed="true"]{background:#1f2937;border-color:#1f2937;color:#fff}
+  .spacer{flex:1}
+  .trace-btns{display:flex;gap:6px;align-items:center}
+  button.t{font-size:12.5px;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:#fff;color:#33405c;cursor:pointer}
+  button.t:hover:not(:disabled){border-color:#9aa6c0}
+  button.t:disabled{opacity:.4;cursor:not-allowed}
+  button.t.primary{background:var(--cons);border-color:var(--cons);color:#fff}
+  button.t.primary:hover{background:#6d2fd6}
+
+  svg#net{display:block;width:100%;height:auto}
+  svg#net text{font-family:inherit;user-select:none}
+  .panel-bg{fill:#fbfcfe;stroke:#e6eaf3;stroke-dasharray:4 4}
+  .panel-label{font-size:11.5px;letter-spacing:.06em;fill:#7b849a}
+
+  g.node{cursor:pointer}
+  g.node rect{fill:#fff;stroke-width:1.5;transition:filter .15s}
+  g.node:hover rect{filter:drop-shadow(0 2px 6px rgba(20,25,40,.14))}
+  g.node .nt{font-size:15px;font-weight:600;fill:var(--ink)}
+  g.node .ns{font-size:11.5px;fill:#6b7590}
+  g.node.src rect{stroke:var(--src)}      g.node.src rect.hd{fill:var(--src-bg)}
+  g.node.cons rect{stroke:var(--cons)}    g.node.cons rect.hd{fill:var(--cons-bg)}
+  g.node.tgt rect{stroke:var(--tgt)}      g.node.tgt rect.hd{fill:var(--tgt-bg)}
+  g.node.ver rect{stroke:var(--ver)}      g.node.ver rect.hd{fill:var(--ver-bg)}
+  g.node.sel rect{stroke-width:2.6}
+  g.node.sel .nt{fill:#0b1020}
+  .dim{opacity:.16}
+
+  path.edge{fill:none;stroke:#a8b1c4;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+  path.edge.cons{stroke:#b39ce8}
+  path.edge.hard{stroke:#b39ce8;stroke-dasharray:5 4}
+  path.edge.verify{stroke:#f0a274}
+  path.edge.iter{stroke:#e88a52;stroke-dasharray:6 4}
+  path.edge.active{stroke-width:2.6;stroke:#111827}
+  path.edge.dim{opacity:.12}
+  text.elabel{font-size:11px;fill:#5f6a80;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+  text.elabel.active{fill:#111827;font-weight:600}
+
+  /* ---------- detail panel ---------- */
+  aside.detail{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px 16px 18px;min-height:320px}
+  aside.detail .ph{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  aside.detail h3{font-size:16.5px;margin:0 0 4px;line-height:1.35}
+  aside.detail .tagline{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  aside.detail dl{margin:0}
+  aside.detail dt{font-size:11.5px;letter-spacing:.06em;color:var(--cons);margin-top:12px;text-transform:uppercase}
+  aside.detail dd{margin:3px 0 0;font-size:13.5px;color:#2c3447}
+  aside.detail code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:#f1f3f9;border-radius:4px;padding:1px 5px}
+  .hint{font-size:12.5px;color:var(--muted);background:#f9fafd;border:1px dashed var(--line);border-radius:9px;padding:10px 12px;margin-top:14px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 10px 4px;font-size:12px;color:#5b6478;border-top:1px solid #eef1f7;margin-top:8px}
+  .legend i.ln{display:inline-block;width:22px;height:0;border-top:2px solid #a8b1c4;vertical-align:middle;margin-right:6px}
+  .legend i.flow{border-color:#a8b1c4}
+  .legend i.cons{border-color:#b39ce8}
+  .legend i.hard{border-color:#b39ce8;border-top-style:dashed}
+  .legend i.verify{border-color:#f0a274}
+  .legend i.iter{border-color:#e88a52;border-top-style:dashed}
+
+  /* ---------- tables / cards ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 18px 14px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid #e9edf5;vertical-align:top}
+  th{font-size:12px;letter-spacing:.05em;color:var(--muted);font-weight:600;background:#fafbfe}
+  tr:last-child td{border-bottom:none}
+  td code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:#f2f4f9;border-radius:4px;padding:1px 5px;white-space:nowrap}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid #ddd6f3;background:#f7f4ff;color:#5b3fb0;white-space:nowrap}
+  .tag.gray{border-color:#e2e6ef;background:#f8f9fc;color:#5b6478}
+  .tag.warn{border-color:#f3d3b8;background:#fff7f0;color:#a8501c}
+
+  .steps{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+  .step{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 14px}
+  .step .n{font-size:11.5px;color:var(--cons);letter-spacing:.08em}
+  .step h4{margin:3px 0 5px;font-size:14px}
+  .step p{margin:0;font-size:12.8px;color:#3b4459}
+
+  .quotes{margin:0;padding:0;list-style:none}
+  .quotes li{padding:9px 0 9px 16px;border-left:2px solid #cbb8f2;margin:0 0 2px;font-size:13.5px;color:#2f374a}
+  .note{font-size:12.8px;color:#7a4a20;background:#fff8f1;border:1px solid #f4ddc7;border-radius:10px;padding:11px 13px;margin:12px 0 0}
+  .note b{color:#8a3f0e}
+  .grid2{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media (max-width:900px){.grid2{grid-template-columns:1fr}}
+
+  footer{margin-top:40px;border-top:1px solid var(--line);padding-top:16px;font-size:12.5px;color:var(--muted)}
+  footer a{color:#3355aa}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">Patent relation map</div>
+  <h1>华为「电路移植方法和装置」<br><small>CN116964587A · 申请号 202280005149.1 · 优先权 2022-02-25 · 公开 2023-10-27 · 授权公告 CN116964587B 2026-08-25</small></h1>
+  <div class="badges">
+    <span class="badge">6 位发明人</span>
+    <span class="badge">权利要求 21 条</span>
+    <span class="badge">PCT WO2023/159506A1</span>
+    <span class="badge hot">只给方法，不给代码</span>
+  </div>
+  <p class="lede">
+    <b>一句话核心：</b>把「源工艺电路跑一遍 DC 仿真得到的器件特征值」当作<b>目标工艺电路必须匹配的约束</b>，
+    再用手工建的两张器件查找表（LUT）去反查目标器件的 W/L，而不是一上来就跑 SPICE 迭代调尺寸；
+    失配用 Pelgrom 形式的容忍带兜住，结构关系（关断管、电流镜比例、输入对对称）作为硬约束并入同一约束集，
+    最后由全面仿真把关，不达标就把约束按比例缩放再来一轮。
+  </p>
+</header>
+
+<nav class="jump">
+  <a href="#graph">① 关系网络</a>
+  <a href="#trace">② 源侧什么变成目标侧什么</a>
+  <a href="#loop">③ 迭代闭环</a>
+  <a href="#status">④ 效果 / 公开状态 / 有没有软件</a>
+  <a href="#land">⑤ 落到 OPA_D</a>
+</nav>
+
+<section id="graph">
+  <h2><span class="num">①</span>关系网络：谁产出谁、谁约束谁</h2>
+  <p class="sub">点节点看依据与去向；点上方分类只保留相关链路；点「追一条约束」按 8 步走一遍源→目标。</p>
+
+  <div class="graph-shell">
+    <div class="canvas-card">
+      <div class="toolbar">
+        <button class="chip" data-filter="all" aria-pressed="true">全部</button>
+        <button class="chip" data-filter="feat" aria-pressed="false">器件特征值</button>
+        <button class="chip" data-filter="mismatch" aria-pressed="false">随机失配</button>
+        <button class="chip" data-filter="hard" aria-pressed="false">结构性硬约束</button>
+        <button class="chip" data-filter="verify" aria-pressed="false">验证与迭代</button>
+        <span class="spacer"></span>
+        <span class="trace-btns">
+          <button class="t primary" id="traceStart">▶ 追一条约束</button>
+          <button class="t" id="tracePrev" disabled>上一步</button>
+          <button class="t" id="traceNext" disabled>下一步</button>
+          <button class="t" id="traceReset" disabled>重置</button>
+        </span>
+      </div>
+
+      <svg id="net" viewBox="0 0 1240 862" role="img" aria-label="华为专利关系网络图">
+        <defs>
+          <marker id="ar-flow" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
+            <path d="M0,0.6 L10,5 L0,9.4 z" fill="#a8b1c4"/></marker>
+          <marker id="ar-cons" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
+            <path d="M0,0.6 L10,5 L0,9.4 z" fill="#b39ce8"/></marker>
+          <marker id="ar-verify" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
+            <path d="M0,0.6 L10,5 L0,9.4 z" fill="#f0a274"/></marker>
+          <marker id="ar-iter" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
+            <path d="M0,0.6 L10,5 L0,9.4 z" fill="#e88a52"/></marker>
+          <marker id="ar-dark" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
+            <path d="M0,0.6 L10,5 L0,9.4 z" fill="#111827"/></marker>
+        </defs>
+        <g id="panels"></g>
+        <g id="edges"></g>
+        <g id="labels"></g>
+        <g id="nodes"></g>
+      </svg>
+
+      <div class="legend">
+        <span><i class="ln flow"></i>产出 / 数据流</span>
+        <span><i class="ln cons"></i>变成约束</span>
+        <span><i class="ln hard"></i>结构事实并入约束集（权4 / 权5）</span>
+        <span><i class="ln verify"></i>验证</span>
+        <span><i class="ln iter"></i>不达标回灌</span>
+      </div>
+    </div>
+
+    <aside class="detail" id="detail">
+      <div class="ph">节点详情</div>
+      <h3>先点左边的任一个节点</h3>
+      <div class="tagline">这张图只画了专利里真正出现的因果关系，没有补任何外部方法。</div>
+      <p style="font-size:13.5px;color:#3b4459">
+        三列分别是<b>源工艺侧</b>、<b>约束集</b>、<b>目标工艺侧</b>，最右一列是<b>验证与迭代</b>。
+        紫色实线是「变成约束」，紫色虚线是「结构性硬约束并入」，橙色是「验证 / 回灌迭代」。
+      </p>
+      <div class="hint">
+        最容易被忽略的一点：<b>第一约束条件不是一维的</b>。它同时含「原始特征值 + 随机失配容忍带」
+        「用户点名的关键器件」「工具识别的关断 / 尺寸比例 / 输入对对称」三类东西，前两类是数值，第三类是结构。
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section id="trace">
+  <h2><span class="num">②</span>究竟「源侧的什么」变成了「目标侧的什么约束」</h2>
+  <p class="sub">这是你这句问题的直接答案。左列是从源电路里"提取"的东西，右列是它在目标侧扮演的约束角色。</p>
+
+  <div class="card" style="padding:6px 6px 2px">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:16%">源侧提取什么</th>
+          <th style="width:22%">专利里的符号 / 公式</th>
+          <th style="width:20%">怎么得到</th>
+          <th style="width:22%">变成目标侧哪条约束</th>
+          <th style="width:20%">判定口径</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>关键器件的原始特征值</b><br><span class="tag gray">数值约束</span></td>
+          <td><code>gm_org</code>，以及 gds、fn、tn、id、Vt；<br><code>gm=f(L,W,Vgs,Vds,Vsb)</code>（公式1）</td>
+          <td>对第一电路做 <b>DC 仿真 + 噪声仿真</b>，读偏置点与原始值</td>
+          <td>目标器件对应特征值必须落在容忍带内：<br><code>gm_tgt ∈ [gm_org, gm_var]</code></td>
+          <td>含端点；带内即"满足第一约束"</td>
+        </tr>
+        <tr>
+          <td><b>随机失配</b><br><span class="tag gray">带宽来源</span></td>
+          <td><code>Avt=f(L)</code>（公式2）→ <code>δvt=f(Avt,L,W)</code>（公式3，正文未展开）<br>→ <code>Vgs′=Vgs−n·δVt</code>，n=3（公式4）<br>→ <code>gm_var=f(L,W,Vgs′,Vds,Vsb)</code>（公式5）</td>
+          <td>失配系数从 LUT 查（同样按 L、W 建表），不靠蒙卡现跑</td>
+          <td>决定容忍带的上界：把"单点目标"变成"区间目标"</td>
+          <td>n=3 即 3σ 波动；带越小越难命中</td>
+        </tr>
+        <tr>
+          <td><b>关断器件</b><br><span class="tag">结构硬约束</span></td>
+          <td>「关断信息」</td>
+          <td>调优工具自动识别（非用户手填）</td>
+          <td>目标侧这些管子<b>不参与仿真、不参与优化</b></td>
+          <td>不进入约束，也不允许被移动</td>
+        </tr>
+        <tr>
+          <td><b>尺寸比例关系</b><br><span class="tag">结构硬约束</span></td>
+          <td>「部分器件的尺寸比例关系」</td>
+          <td>工具识别（例：电流镜要求两端 L 必须相同）</td>
+          <td>目标尺寸不能各自独立求，必须<b>成组保持比例</b></td>
+          <td>如 M5/M6 的 L 相同</td>
+        </tr>
+        <tr>
+          <td><b>输入对管对称</b><br><span class="tag">结构硬约束</span></td>
+          <td>「输入对管对称关系」</td>
+          <td>工具识别差分输入对</td>
+          <td>对称管同尺寸、同环境，禁止单边优化</td>
+          <td>对管同时移动</td>
+        </tr>
+        <tr>
+          <td><b>用户点名的关键器件</b><br><span class="tag">人工介入点</span></td>
+          <td>「用户配置的部分关键器件」（权利要求 4）</td>
+          <td>GUI 输入，把源侧特征值"合入"指定器件</td>
+          <td>只优化这些管，其余按预设对应关系直接映射</td>
+          <td>未点名器件不进入约束</td>
+        </tr>
+        <tr>
+          <td><b>电路架构 / 器件对应</b><br><span class="tag gray">拓扑映射</span></td>
+          <td>「预设对应关系」，例：<code>0.9V SVT ↔ 0.8V RVT</code></td>
+          <td>装置内预存源器件→目标器件表</td>
+          <td>先定"第二电路长什么样"，再谈尺寸</td>
+          <td>架构不变（图6：两电路同构、参数不同）</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>关键设计取舍：</b>专利明说尺寸有两条求法——<b>查表法</b>（在第二 LUT 里找落带内、且满足基尔霍夫方程的器件尺寸，<i>完全不用仿真器</i>，快但粗）
+    与 <b>DC 迭代法</b>（对第二电路跑 DC/噪声，逐个比约束，不满足就改尺寸，<i>精度更高</i>）。两条路并存，是因为它把"可行性筛查"和"精度收敛"分成了两级。
+  </div>
+</section>
+
+<section id="loop">
+  <h2><span class="num">③</span>不达标怎么办：第二约束就是第一约束按比例缩放</h2>
+  <p class="sub">权利要求 2 与说明书公式 6 / 公式 7。注意它是"同时缩放特征值与失配带"，不是只放一个。</p>
+
+  <div class="steps">
+    <div class="step"><div class="n">STEP 1</div><h4>全面仿真</h4><p>用第二仿真用例跑 DC、AC、瞬态、PSS、蒙特卡洛，得到整体规格。</p></div>
+    <div class="step"><div class="n">STEP 2</div><h4>逐项判规格</h4><p>任一指标不达标（如增益不够）即进入回灌，不是"差不多就过"。</p></div>
+    <div class="step"><div class="n">STEP 3</div><h4>缩放成第二约束</h4><p><code>β0_low·gm_org ≤ gm_target ≤ β0_high·gm_org</code>；失配带同理用 <code>β1_low / β1_high</code> 缩放。</p></div>
+    <div class="step"><div class="n">STEP 4</div><h4>再求尺寸</h4><p>回到第二 LUT 查表，或对第二电路重跑 DC 迭代，再全面仿真，直到规格达成。</p></div>
+  </div>
+
+  <div class="note" style="color:#3b4459;background:#f8f9fd;border-color:#e3e8f2">
+    <b>β 从哪来：</b>不是拍脑袋常数——说明书说 <code>β0_low / β0_high</code>（以及 <code>β1_low / β1_high</code>）
+    也可以写进第一器件查找表，按器件的 <code>L、W</code> 查出来。这样一来"放宽多少"本身也是工艺知识，而不是调参玄学。
+  </div>
+</section>
+
+<section id="status">
+  <h2><span class="num">④</span>效果怎么样、公开到什么程度、有没有现成的 SKILL 或软件</h2>
+  <p class="sub">三件事分开说，避免把"专利公开"误当成"实现公开"。</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-size:15.5px">4.1 效果：只有定性，没有数字</h3>
+      <ul class="quotes">
+        <li>提升不同工艺下电路移植的效率、降低移植复杂度（摘要 / 发明内容）。</li>
+        <li>以器件特征值匹配替代盲目 SPICE 迭代，<b>减少电路移植的设计和验证工作量</b>，降低对有经验设计者的依赖。</li>
+        <li>查表法定尺寸"<b>不需要使用仿真工具，可有效缩短调优时间</b>"；DC 迭代法"精度相对更高"。</li>
+        <li>用"较少的资源开销实现电路的自动化优化"，通过反复迭代"最终实现第二电路规格的达成"。</li>
+      </ul>
+      <div class="note">
+        <b>必须说清楚：</b>我通读了公开文本（说明书 + 21 条权利要求），<b>没有任何量化结果</b>——
+        没有耗时、没有面积、没有精度百分比、没有良率、没有对比实验，全文唯一的具体数字是"n=3（3σ）"、"0.9V SVT→0.8V RVT"、
+        "180nm→65nm"和附图编号。<b>所以不能拿这篇专利当"效果证据"</b>，只能当"流程证据"。
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-size:15.5px">4.2 公开状态：文本公开，实现不公开</h3>
+      <table>
+        <tbody>
+          <tr><th style="width:34%">公开号</th><td><code>CN116964587A</code>（2023-10-27 公布）</td></tr>
+          <tr><th>授权公告</th><td><code>CN116964587B</code>（2026-08-25，法律状态 Active）</td></tr>
+          <tr><th>PCT 同族</th><td><code>WO2023/159506A1</code>（2023-08-31）</td></tr>
+          <tr><th>申请 / 优先权</th><td>2022-02-25（CN202280005149.1）</td></tr>
+          <tr><th>申请人 / 发明人</th><td>华为技术有限公司；李定、胡贻升、廖恒、龙子超、孟祥隆、丁翀俊</td></tr>
+          <tr><th>被引用</th><td>晶铁半导体 <code>CN118364755A</code>（版图设计迁移）等</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:#5b6478;margin:10px 0 0">
+        公开的是<b>权利要求书 + 说明书 + 附图</b>，属于「方法公开」，不是「实现公开」；没有源代码、没有二进制、没有可下载的装置。
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin:0 0 10px;font-size:15.5px">4.3 有没有现成的 SKILL 脚本或软件？——没有</h3>
+    <table>
+      <thead><tr><th style="width:22%">你问的东西</th><th style="width:12%">有/没有</th><th>依据</th></tr></thead>
+      <tbody>
+        <tr><td>SKILL 脚本</td><td><span class="tag warn">没有</span></td><td>全文没有出现 SKILL、Cadence、Virtuoso 任何字样；"调优装置"只是功能描述（提取单元 701 / 确定单元 702 / 仿真单元 703）。</td></tr>
+        <tr><td>可运行软件 / 开源实现</td><td><span class="tag warn">没有</span></td><td>专利保护"方法 + 装置（处理器+存储器）+ 芯片 + 存储介质 + 程序产品"，是保护范围，不是交付物。</td></tr>
+        <tr><td>器件 LUT 本身</td><td><span class="tag warn">没有</span></td><td>只写了"用 DC + 噪声仿真扫描建表"，表长什么样、多少维、怎么存，完全没给。</td></tr>
+        <tr><td>实施例电路</td><td><span class="tag gray">只有框图</span></td><td>图5 是一个运算放大器示意图，作为"特征值怎么算"的举例，没有尺寸、没有工艺名、没有实测。</td></tr>
+        <tr><td>与 WiCkeD SPT 的关系</td><td><span class="tag gray">互补</span></td><td>SPT 管"把原理图换成目标 PDK 的器件和参数"（结构搬运）；这篇管"搬完之后尺寸怎么定"（数值收敛）。两层不同，别混为一谈。</td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      <b>要落地只能自建，四段最小实现：</b>
+      ① Spectre DC/noise 扫描脚本（Vgs×Vds×Vsb×L×W×器件类型）→ ② LUT（parquet/csv，带 Avt、β 列）→
+      ③ 约束求解（查表命中 + KCL/KVL 联立；或对网表做 DC 迭代/接优化器）→ ④ 全面仿真回归 + 规格判定。
+      我们仓库里能直接接上的，是 ② 归工单 05（目标 PDK 探针 + 器件映射草案）、③ 归工单 08（重定尺寸）、④ 归工单 09（五层验收）。
+    </div>
+    <div class="note" style="color:#7a4a20">
+      <b>一个提醒（不是法律意见）：</b>该申请已于 2026-08-25 授权公告。做研究、做内部流程验证与"商业实施"是两回事，
+      真要把它做成产品/对外服务，权项范围需要专业检索和评估；本页只做技术拆解。
+    </div>
+  </div>
+</section>
+
+<section id="land">
+  <h2><span class="num">⑤</span>落到我们这张 OPA_D 上，接口在哪</h2>
+  <p class="sub">沿用工单编号，避免另起一套说法。</p>
+  <div class="steps">
+    <div class="step"><div class="n">工单 05</div><h4>两张 LUT</h4><p>smic18ee 与 PDK_13mmrf 各扫一份：gm/gds/fn/tn/id/Vt + Avt(L)。这就是专利里"第一/第二器件查找表"的实体。</p></div>
+    <div class="step"><div class="n">工单 07</div><h4>预设对应关系</h4><p>8 个 MOS + Cc/Rz/Rb 的源→目标器件映射表，等价于权 1 的"存在预设对应关系的第二电路"。</p></div>
+    <div class="step"><div class="n">工单 08</div><h4>第一约束 → 尺寸</h4><p>源电路 DC 仿真取 gm_org 与容忍带，作为重定尺寸的目标函数；结构约束（电流镜同 L、输入对对称）写成硬约束。</p></div>
+    <div class="step"><div class="n">工单 09</div><h4>全面仿真把关</h4><p>45 点 PVT + 蒙卡就是我们版的"全面仿真"；不达标的回灌规则可直接借 β0/β1 缩放。</p></div>
+  </div>
+</section>
+
+<footer>
+  <p><b>依据：</b>本页文字与公式全部取自 CN116964587A 公开文本（说明书 + 权利要求 1–21）。本地文件
+  <span class="mono">papers/Huawei_CN116964587A.pdf</span> 是<b>扫描图像件、无文字层</b>，正文经
+  <a href="https://patents.google.com/patent/CN116964587A/zh" target="_blank" rel="noopener">Google Patents 同族文本</a> 核对；
+  权利要求编号对应 A 公布文本。同一段落在 B 授权文本中编号可能微调。</p>
+  <p>图中标注的「权1 / 权2 / 权4 / 权5 / 权6 / 权7 / 权8 / 权9」均指 CN116964587A 权利要求序号；「公式1–7」指说明书中的编号。</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var W = 235, H = 66;
+
+  var NODES = [
+    {id:"S_ckt",  x:40,  y:100, c:"src",  t:"第一电路",            s:"源工艺下已验收的设计", tags:["feat"],
+     d:{what:"专利里的「第一电路」，也就是要被搬走的、在源工艺下已经验证过的电路。",
+        basis:"权利要求 1（确定与第一电路存在预设对应关系的第二电路）；说明书步骤 402。",
+        next:"它只提供两件事：偏置点（给 DC 仿真）和要被匹配的性能。"}},
+
+    {id:"S_uc",   x:40,  y:200, c:"src",  t:"第一仿真用例",        s:"规格、激励与测试台", tags:["feat"],
+     d:{what:"源工艺下用来判定规格的仿真用例；专利强调第二仿真用例通常与它相同。",
+        basis:"权利要求 1；说明书步骤 302：\"第一仿真用例和第二仿真用例相同\"。",
+        next:"直接决定目标侧「全面仿真」的口径，是迁移可复现的前提。"}},
+
+    {id:"S_sim",  x:40,  y:300, c:"src",  t:"源电路 DC + 噪声仿真", s:"取偏置点与原始特征值", tags:["feat"],
+     d:{what:"对第一电路做 DC 仿真（配噪声仿真），得到关键器件的偏置电压与原始特征值 gm_org 等。",
+        basis:"权利要求 7；说明书步骤 403、405。",
+        next:"它的输出就是「第一约束条件」的数值那一半。"}},
+
+    {id:"S_swp",  x:40,  y:400, c:"src",  t:"多维扫描",            s:"Vgs·Vds·Vsb × L × W（权3）", tags:["feat"],
+     d:{what:"对每类器件在多维电压、沟道长度、沟道宽度上遍历，得到每个工作点下的器件特征值。",
+        basis:"权利要求 3；说明书步骤 401 与公式 1：gm=f(L,W,Vgs,Vds,Vsb)。",
+        next:"这是 LUT 的唯一来源。器件类型包括 MOSFET 与 BJT。"}},
+
+    {id:"S_lut",  x:40,  y:500, c:"src",  t:"第一器件查找表", s:"LUT_src：特征值 + Avt(L)", tags:["feat","mismatch"],
+     d:{what:"源工艺的器件特征值表，除特征值外还带「第一随机失配信息」，即失配系数。",
+        basis:"权利要求 6；说明书：特征值含 gm、gds、fn、tn、id、Vt。",
+        next:"供两用：一是查失配系数算容忍带，二是作为「目标器件该长成什么样」的参照。"}},
+
+    {id:"S_mm",   x:40,  y:600, c:"src",  t:"随机失配链",          s:"Avt→δvt→Vgs′→gm_var（权6/7）", tags:["mismatch"],
+     d:{what:"由失配系数 Avt 推阈值电压标准差 δvt，再用 Vgs′=Vgs−n·δVt 求出 gm 的失配值 gm_var。",
+        basis:"公式 2–5；说明书：n 例如取 3，表示容忍 3σ；Avt 按器件 L 查表。",
+        next:"gm_var 与 gm_org 一起夹出一条容忍带，而不是一个点。"}},
+
+    {id:"C_user", x:330, y:100, c:"cons", t:"用户配置关键器件",     s:"GUI 点名 M1…M8（权4）", tags:["hard"],
+     d:{what:"用户通过图形界面指定「哪些管子是关键器件」，并合入需要匹配的特征值。",
+        basis:"权利要求 4：第一约束条件包括用户配置的部分关键器件特征值，且与第一电路相同。",
+        next:"没被点名的器件不进入数值约束，只按预设对应关系直接映射。"}},
+
+    {id:"C_off",  x:330, y:180, c:"cons", t:"关断器件",            s:"不参与仿真与优化（权5）", tags:["hard"],
+     d:{what:"工具自动识别被关断的管子；这些管子既不参与仿真，也不参与优化。",
+        basis:"权利要求 5：关键信息包括「关断信息」。",
+        next:"这是「少算」的关键：关断管不进求解，能显著缩小问题规模。"}},
+
+    {id:"C_ratio",x:330, y:270, c:"cons", t:"尺寸比例关系",        s:"电流镜要求 L 相同（权5）", tags:["hard"],
+     d:{what:"器件与器件之间的尺寸比例关系，例如电流镜两端 L 必须相同。",
+        basis:"权利要求 5；说明书步骤 403：\"电流镜像电路要求不同器件的长度必须相同\"。",
+        next:"它把原本独立的每管求解，变成成组求解——单管查表会破坏这个关系。"}},
+
+    {id:"C_sym",  x:330, y:360, c:"cons", t:"输入对管对称",        s:"差分对同尺寸同环境（权5）", tags:["hard"],
+     d:{what:"输入差分对的对称关系，属于结构约束而非数值约束。",
+        basis:"权利要求 5：关键信息包括「输入对管对称关系」。",
+        next:"对称管必须同时动，否则失配与系统失调会一起恶化。"}},
+
+    {id:"C_key",  x:330, y:470, c:"cons", t:"关键器件原始特征值",   s:"gm_org·gds·fn·tn·id·Vt（权7）", tags:["feat"],
+     d:{what:"对第一电路 DC 仿真得到的原始特征值，是「要匹配到什么」的绝对值。",
+        basis:"权利要求 7；说明书步骤 403：先 DC/噪声仿真得原始值，再配 LUT 得失配值。",
+        next:"它和 gm_var 合成容忍带，构成第一约束条件的数值部分。"}},
+
+    {id:"C_band", x:330, y:580, c:"cons", t:"第一约束条件（容忍带）", s:"gm_tgt ∈ [gm_org, gm_var]（权1）", tags:["feat","mismatch"],
+     d:{what:"第一约束条件的实体：原始特征值 + 随机失配值，再加三类结构约束。",
+        basis:"权利要求 1、4、5、7；说明书：只要目标值落在 gm_org 与 gm_var 之间（含端点）即算满足。",
+        next:"它是目标侧求解的唯一目标函数；不达标时会被 β0/β1 缩放成第二约束。"}},
+
+    {id:"C_kcl",  x:330, y:690, c:"cons", t:"基尔霍夫方程",        s:"KCL / KVL 联合判定（权8/9）", tags:["hard"],
+     d:{what:"查表查到的候选尺寸，必须在电路层面满足基尔霍夫电流/电压定律才合法。",
+        basis:"权利要求 8（查表后按 KCL 选）与权利要求 9（DC 迭代时同时判约束与 KCL）。",
+        next:"这是把「每管都对」变成「整个电路对」的那一步，也是逐管查表最容易漏的环节。"}},
+
+    {id:"T_ckt",  x:620, y:100, c:"tgt",  t:"第二电路",            s:"按预设对应关系生成（权1）", tags:[],
+     d:{what:"目标工艺下的对应电路：拓扑同构，器件换成本工艺的等价器件。",
+        basis:"权利要求 1；说明书举例：源工艺 0.9V SVT 的 MOS 对应目标工艺 0.8V RVT 的 MOS。",
+        next:"先有电路骨架，才有尺寸可求——专利把「映射」与「定尺寸」分成两步。"}},
+
+    {id:"T_uc",   x:620, y:200, c:"tgt",  t:"第二仿真用例",        s:"通常与第一用例相同", tags:[],
+     d:{what:"目标工艺下的仿真用例，一般直接复用第一用例（含激励、负载、判据）。",
+        basis:"说明书步骤 302、402。",
+        next:"保证「源基线」与「迁移结果」在同一把尺子下比较。"}},
+
+    {id:"T_lut",  x:620, y:300, c:"tgt",  t:"第二器件查找表", s:"LUT_tgt：同流程扫描 + 失配", tags:["feat","mismatch"],
+     d:{what:"目标工艺的器件表，建法与源侧完全一致，另带目标工艺自己的失配系数。",
+        basis:"权利要求 6：第二 LUT 含目标工艺器件特征值与第二随机失配信息。",
+        next:"目标尺寸是在这张表里「反查」出来的，不是在仿真器里试出来的。"}},
+
+    {id:"T_size", x:620, y:440, c:"tgt",  t:"目标器件尺寸 L / W",   s:"查表命中，或 DC 迭代求解", tags:["feat"],
+     d:{what:"最终要给出的东西：目标电路每个器件的沟道长度与宽度。",
+        basis:"权利要求 1 第 4 步、权利要求 8 / 9。",
+        next:"两条路：查表法（不用仿真器，快）与 DC 迭代法（精度更高），可先粗后细。"}},
+
+    {id:"T_dc",   x:620, y:560, c:"tgt",  t:"DC 迭代",            s:"仿真→比约束→改尺寸（权9）", tags:["feat"],
+     d:{what:"对第二电路反复做 DC（+噪声）仿真，按仿真结果调整器件尺寸，直到满足第一约束与 KCL。",
+        basis:"权利要求 9；说明书步骤 405：\"精度相对步骤 404 直接查表要高\"。",
+        next:"代价是每次迭代都要跑仿真；它的价值是在查表失败时保底。"}},
+
+    {id:"V_done", x:910, y:100, c:"ver",  t:"迁移完成",            s:"尺寸定 + 全面仿真达标", tags:["verify"],
+     d:{what:"两个条件同时成立才算完成：器件尺寸确定，且全面仿真下电路规格达标。",
+        basis:"说明书步骤 406：所有器件满足规格，第二电路即最终移植结果。",
+        next:"注意：专利的「完成」不含版图、不含 PEX、不含 DRC/LVS——只到原理图与仿真为止。"}},
+
+    {id:"V_full", x:910, y:220, c:"ver",  t:"全面仿真",            s:"DC·AC·Trans·PSS·MC（权1）", tags:["verify"],
+     d:{what:"用第二仿真用例做多种分析：DC、瞬态、交流、周期稳态、蒙特卡洛，得到整体性能。",
+        basis:"权利要求 1 第 5 步；说明书步骤 406 列出 DC/瞬态/AC/PSS/蒙卡。",
+        next:"这一步才判「电路整体」而不只是「器件特征值」是否达标。"}},
+
+    {id:"V_judge",x:910, y:340, c:"ver",  t:"规格是否满足",        s:"最差项判据", tags:["verify"],
+     d:{what:"检查全面仿真后每个器件的规格是否满足；任一不满足即回灌。",
+        basis:"说明书步骤 406：至少一个器件的规格不满足，则进入步骤 407。",
+        next:"回灌不是重来，而是把约束按比例放宽再解一次。"}},
+
+    {id:"V_c2",   x:910, y:500, c:"ver",  t:"第二约束条件",        s:"β0/β1 按比例缩放（权2）", tags:["verify"],
+     d:{what:"把第一约束按比例缩放成新目标：特征值用 β0_low…β0_high，失配带用 β1_low…β1_high。",
+        basis:"权利要求 2；公式 6、公式 7；β 也可从 LUT 按 L、W 查出。",
+        next:"缩放后回到第二 LUT 查表或 DC 迭代，再全面仿真，循环至达成。"}}
+  ];
+
+  var PANELS = [
+    {x:18,  y:64,  w:279, h:656, label:"源工艺侧",              labelY:708},
+    {x:306, y:64,  w:284, h:726, label:"约束集（数值 + 结构）",  labelY:776},
+    {x:596, y:64,  w:284, h:596, label:"目标工艺侧",            labelY:648},
+    {x:886, y:64,  w:309, h:536, label:"验证与迭代",            labelY:588}
+  ];
+
+  var EDGES = [
+    {k:"S_swp|S_lut",   p:[[157.5,466],[157.5,500]], type:"flow"},
+    {k:"S_lut|S_mm",    p:[[157.5,566],[157.5,600]], type:"flow"},
+    {k:"S_ckt|S_sim",   p:[[40,133],[28,133],[28,333],[40,333]], type:"flow"},
+    {k:"S_uc|S_sim",    p:[[157.5,266],[157.5,300]], type:"flow"},
+    {k:"S_sim|C_key",   p:[[275,333],[303,333],[303,503],[330,503]], type:"cons"},
+    {k:"S_mm|C_band",   p:[[275,633],[312,633],[312,613],[330,613]], type:"cons",
+      label:"gm_var", lx:308, ly:673, anchor:"end"},
+    {k:"C_key|C_band",  p:[[447.5,536],[447.5,580]], type:"cons",
+      label:"+ 失配值", lx:453, ly:562, anchor:"start"},
+    {k:"C_user|C_band", p:[[565,133],[571,133],[571,565],[520,565],[520,580]], type:"hard"},
+    {k:"C_off|C_band",  p:[[565,213],[577,213],[577,565],[480,565],[480,580]], type:"hard"},
+    {k:"C_ratio|C_band",p:[[565,303],[583,303],[583,565],[440,565],[440,580]], type:"hard"},
+    {k:"C_sym|C_band",  p:[[565,393],[589,393],[589,565],[400,565],[400,580]], type:"hard"},
+    {k:"C_band|T_size", p:[[565,613],[596,613],[596,473],[620,473]], type:"cons",
+      label:"带内命中", lx:600, ly:546, anchor:"start"},
+    {k:"C_kcl|T_size",  p:[[565,723],[604,723],[604,490],[620,490]], type:"cons",
+      label:"且满足 KCL/KVL", lx:610, ly:700, anchor:"start"},
+    {k:"S_ckt|T_ckt",   p:[[275,133],[286,133],[286,84],[700,84],[700,100]], type:"flow",
+      label:"预设对应关系", lx:480, ly:78, anchor:"middle"},
+    {k:"S_uc|T_uc",     p:[[275,233],[292,233],[292,183],[700,183],[700,200]], type:"flow",
+      label:"用例对应", lx:480, ly:177, anchor:"middle"},
+    {k:"S_swp|T_lut",   p:[[275,433],[298,433],[298,283],[740,283],[740,300]], type:"flow",
+      label:"同一套扫描流程", lx:500, ly:262, anchor:"middle"},
+    {k:"T_lut|T_size",  p:[[737.5,366],[737.5,440]], type:"flow"},
+    {k:"T_size|T_dc",   p:[[751.5,506],[751.5,560]], type:"flow", both:true,
+      label:"初值 ⇄ 迭代", lx:757, ly:538, anchor:"start"},
+    {k:"T_size|V_full", p:[[855,473],[888,473],[888,262],[910,262]], type:"verify",
+      label:"尺寸定后全面仿真", lx:890, ly:430, anchor:"middle"},
+    {k:"T_uc|V_full",   p:[[855,233],[882,233],[882,247],[910,247]], type:"verify"},
+    {k:"V_full|V_judge",p:[[1027.5,286],[1027.5,340]], type:"verify"},
+    {k:"V_judge|V_done",p:[[1145,373],[1170,373],[1170,133],[1145,133]], type:"verify",
+      label:"满足", lx:1174, ly:250, anchor:"start"},
+    {k:"V_judge|V_c2",  p:[[1027.5,406],[1027.5,500]], type:"iter",
+      label:"不满足", lx:1033, ly:445, anchor:"start"},
+    {k:"V_c2|C_band",   p:[[910,533],[880,533],[880,815],[575,815],[575,613],[565,613]], type:"iter",
+      label:"第二约束 β0 / β1 缩放后回灌", lx:700, ly:808, anchor:"middle"}
+  ];
+
+  var MARKER = {flow:"ar-flow", cons:"ar-cons", hard:"ar-cons", verify:"ar-verify", iter:"ar-iter"};
+
+  var nodeById = {};
+  NODES.forEach(function(n){ nodeById[n.id] = n; });
+
+  var svgNS = "http://www.w3.org/2000/svg";
+  var gPanels = document.getElementById("panels");
+  var gEdges  = document.getElementById("edges");
+  var gLabels = document.getElementById("labels");
+  var gNodes  = document.getElementById("nodes");
+
+  function el(name, attrs){
+    var e = document.createElementNS(svgNS, name);
+    for (var k in attrs) { e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+
+  /* ---- panels ---- */
+  PANELS.forEach(function(p){
+    gPanels.appendChild(el("rect", {x:p.x, y:p.y, width:p.w, height:p.h, rx:14, "class":"panel-bg"}));
+    var t = el("text", {x:p.x+12, y:p.labelY, "class":"panel-label"});
+    t.textContent = p.label;
+    gPanels.appendChild(t);
+  });
+
+  /* ---- edges ---- */
+  var edgeEls = {};
+  EDGES.forEach(function(e){
+    var d = e.p.map(function(pt,i){ return (i? "L":"M") + pt[0] + " " + pt[1]; }).join(" ");
+    var path = el("path", {d:d, "class":"edge " + e.type});
+    path.setAttribute("marker-end", "url(#" + MARKER[e.type] + ")");
+    if (e.both) { path.setAttribute("marker-start", "url(#" + MARKER[e.type] + ")"); }
+    path.dataset.key = e.k;
+    gEdges.appendChild(path);
+    edgeEls[e.k] = path;
+
+    if (e.label) {
+      var tx = el("text", {x:e.lx, y:e.ly, "class":"elabel", "text-anchor": e.anchor || "middle"});
+      tx.textContent = e.label;
+      tx.dataset.forKey = e.k;
+      gLabels.appendChild(tx);
+    }
+  });
+
+  /* ---- nodes ---- */
+  var nodeEls = {};
+  NODES.forEach(function(n){
+    var g = el("g", {"class":"node " + n.c});
+    g.dataset.id = n.id;
+    var rect = el("rect", {x:n.x, y:n.y, width:W, height:H, rx:11, "class":"hd"});
+    g.appendChild(rect);
+    var t1 = el("text", {x:n.x+13, y:n.y+27, "class":"nt"});
+    t1.textContent = n.t;
+    g.appendChild(t1);
+    var t2 = el("text", {x:n.x+13, y:n.y+47, "class":"ns"});
+    t2.textContent = n.s;
+    g.appendChild(t2);
+    g.addEventListener("click", function(){ select(n.id); });
+    gNodes.appendChild(g);
+    nodeEls[n.id] = g;
+  });
+
+  /* ---- selection / filtering ---- */
+  var selected = null;
+  var activeFilter = "all";
+
+  function clearClasses(){
+    NODES.forEach(function(n){
+      var g = nodeEls[n.id];
+      g.classList.remove("sel","dim");
+    });
+    EDGES.forEach(function(e){
+      var p = edgeEls[e.k];
+      p.classList.remove("active","dim");
+      p.setAttribute("marker-end", "url(#" + MARKER[e.type] + ")");
+      if (e.both) { p.setAttribute("marker-start", "url(#" + MARKER[e.type] + ")"); }
+    });
+    document.querySelectorAll("text.elabel").forEach(function(t){
+      t.classList.remove("active");
+    });
+  }
+
+  function activateEdge(key){
+    var e = null;
+    for (var i = 0; i < EDGES.length; i++) { if (EDGES[i].k === key) { e = EDGES[i]; break; } }
+    var p = edgeEls[key];
+    p.classList.add("active");
+    p.setAttribute("marker-end", "url(#ar-dark)");
+    if (e && e.both) { p.setAttribute("marker-start", "url(#ar-dark)"); }
+  }
+
+  function neighborsOf(id){
+    var out = {};
+    EDGES.forEach(function(e){
+      var a = e.k.split("|");
+      if (a[0] === id) { out[a[1]] = true; out[e.k] = true; }
+      if (a[1] === id) { out[a[0]] = true; out[e.k] = true; }
+    });
+    return out;
+  }
+
+  function applyFilter(){
+    clearClasses();
+    if (activeFilter !== "all") {
+      NODES.forEach(function(n){
+        if (n.tags.indexOf(activeFilter) === -1) { nodeEls[n.id].classList.add("dim"); }
+      });
+      EDGES.forEach(function(e){
+        var a = e.k.split("|");
+        var na = nodeById[a[0]], nb = nodeById[a[1]];
+        var keep = (na.tags.indexOf(activeFilter) !== -1) || (nb.tags.indexOf(activeFilter) !== -1);
+        if (!keep) { edgeEls[e.k].classList.add("dim"); }
+      });
+    }
+  }
+
+  function select(id){
+    selected = id;
+    clearClasses();
+    var nb = neighborsOf(id);
+    NODES.forEach(function(n){
+      if (n.id !== id && !nb[n.id]) { nodeEls[n.id].classList.add("dim"); }
+    });
+    EDGES.forEach(function(e){
+      var a = e.k.split("|");
+      if (a.indexOf(id) !== -1) { activateEdge(e.k); }
+      else { edgeEls[e.k].classList.add("dim"); }
+    });
+    document.querySelectorAll("text.elabel").forEach(function(t){
+      var a = t.dataset.forKey.split("|");
+      if (a.indexOf(id) !== -1) { t.classList.add("active"); }
+    });
+    nodeEls[id].classList.add("sel");
+    if (activeFilter !== "all") { applyFilter(); }
+    renderDetail(nodeById[id]);
+  }
+
+  function esc(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function renderDetail(n){
+    var clusterName = {src:"源工艺侧", cons:"约束集", tgt:"目标工艺侧", ver:"验证与迭代"}[n.c];
+    var html = "";
+    html += '<div class="ph">' + clusterName + '</div>';
+    html += '<h3>' + esc(n.t) + '</h3>';
+    html += '<div class="tagline">' + esc(n.s) + '</div>';
+    html += '<dl>';
+    html += '<dt>是什么</dt><dd>' + esc(n.d.what) + '</dd>';
+    html += '<dt>依据</dt><dd>' + esc(n.d.basis) + '</dd>';
+    html += '<dt>去向 / 作用</dt><dd>' + esc(n.d.next) + '</dd>';
+    html += '</dl>';
+    var inc = [], out = [];
+    EDGES.forEach(function(e){
+      var a = e.k.split("|");
+      if (a[0] === n.id) { out.push(esc(nodeById[a[1]].t)); }
+      if (a[1] === n.id) { inc.push(esc(nodeById[a[0]].t)); }
+    });
+    if (inc.length) { html += '<dt style="font-size:11.5px;color:var(--cons);margin-top:12px;letter-spacing:.06em">上游输入</dt><dd style="font-size:13px">' + inc.join("、") + '</dd>'; }
+    if (out.length) { html += '<dt style="font-size:11.5px;color:var(--cons);margin-top:10px;letter-spacing:.06em">下游去向</dt><dd style="font-size:13px">' + out.join("、") + '</dd>'; }
+    document.getElementById("detail").innerHTML = html;
+  }
+
+  document.querySelectorAll(".chip").forEach(function(chip){
+    chip.addEventListener("click", function(){
+      document.querySelectorAll(".chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
+      chip.setAttribute("aria-pressed","true");
+      activeFilter = chip.dataset.filter;
+      if (activeFilter === "all") { clearClasses(); } else { applyFilter(); }
+    });
+  });
+
+  /* ---- tracer ---- */
+  var STEPS = [
+    {n:["S_swp","S_lut"], e:["S_swp|S_lut"],
+     t:"先把源工艺每种器件扫成一张表：扫 Vgs、Vds、Vsb 和 L、W，记录 gm、gds、fn、tn、id、Vt，外加失配系数 Avt(L)。这是「第一器件查找表」。"},
+    {n:["S_ckt","S_sim","C_key"], e:["S_ckt|S_sim","S_sim|C_key"],
+     t:"再对第一电路本身跑一遍 DC（配噪声）仿真，读出每个关键管的偏置点和原始特征值 gm_org。注意：这里取的不是「理想值」，而是这颗真实电路此刻工作点上的值。"},
+    {n:["S_mm","C_band"], e:["S_lut|S_mm","S_mm|C_band"],
+     t:"用失配系数 Avt 推 δvt，取 n=3σ，把栅压挪到 Vgs′=Vgs−3δVt，再算 gm_var。于是目标不是「gm 等于某个数」，而是「落在 [gm_org, gm_var] 这条带里」。"},
+    {n:["C_user","C_off","C_ratio","C_sym","C_band"], e:["C_user|C_band","C_off|C_band","C_ratio|C_band","C_sym|C_band"],
+     t:"同时把三类「结构事实」并进同一约束集：用户点名的关键管（只优化这些）、工具识别的关断管（不参与仿真）、电流镜等尺寸比例（必须成组保持）、输入对对称（不许单边动）。"},
+    {n:["T_ckt","T_lut"], e:["S_ckt|T_ckt","S_swp|T_lut"],
+     t:"目标侧先把电路建出来（按预设对应关系换器件，例如 0.9V SVT → 0.8V RVT），再用完全相同的一套扫描流程建第二张 LUT，带目标工艺自己的失配信息。"},
+    {n:["T_size","T_dc"], e:["C_band|T_size","C_kcl|T_size","T_lut|T_size","T_size|T_dc"],
+     t:"然后反查尺寸：在第二 LUT 里找落进容忍带、且整组满足基尔霍夫方程的 (L, W)。查不到就退到 DC 迭代——改尺寸、重仿真、再比约束，精度更高但更慢。"},
+    {n:["V_full","V_judge"], e:["T_size|V_full","T_uc|V_full","V_full|V_judge"],
+     t:"尺寸定了不等于电路成了。用第二仿真用例跑全面仿真：DC、AC、瞬态、PSS、蒙特卡洛，按最差项判规格。"},
+    {n:["V_c2"], e:["V_judge|V_c2","V_c2|C_band"],
+     t:"不达标就把约束整体缩放出「第二约束条件」：特征值乘 β0_low…β0_high，失配带乘 β1_low…β1_high（β 也能从 LUT 按 L、W 查）。回到第 6 步，循环直到规格达成。"}
+  ];
+  var traceIdx = -1;
+
+  function renderTrace(){
+    clearClasses();
+    if (traceIdx < 0) {
+      document.getElementById("detail").innerHTML =
+        '<div class="ph">追踪模式</div><h3>点「下一步」开始</h3>' +
+        '<div class="tagline">8 步走完「源侧提取 → 目标侧约束 → 全面仿真 → 缩放回灌」。</div>' +
+        '<p style="font-size:13.5px;color:#3b4459">追踪只看一条主链，不看旁支，这样因果关系不会被图上的交叉线搅乱。</p>';
+      return;
+    }
+    var st = STEPS[traceIdx];
+    NODES.forEach(function(n){
+      if (st.n.indexOf(n.id) === -1) { nodeEls[n.id].classList.add("dim"); }
+      else { nodeEls[n.id].classList.add("sel"); }
+    });
+    EDGES.forEach(function(e){
+      if (st.e.indexOf(e.k) !== -1) { activateEdge(e.k); }
+      else { edgeEls[e.k].classList.add("dim"); }
+    });
+    document.querySelectorAll("text.elabel").forEach(function(t){
+      if (st.e.indexOf(t.dataset.forKey) !== -1) { t.classList.add("active"); }
+    });
+    var html = '<div class="ph">第 ' + (traceIdx+1) + ' / ' + STEPS.length + ' 步</div>';
+    html += '<h3>' + esc(st.n.map(function(id){ return nodeById[id].t; }).join(" → ")) + '</h3>';
+    html += '<p style="font-size:13.8px;color:#2c3447;margin:10px 0 0">' + esc(st.t) + '</p>';
+    document.getElementById("detail").innerHTML = html;
+    document.getElementById("tracePrev").disabled = traceIdx <= 0;
+    document.getElementById("traceNext").disabled = traceIdx >= STEPS.length - 1;
+    document.getElementById("traceReset").disabled = false;
+  }
+
+  document.getElementById("traceStart").addEventListener("click", function(){
+    traceIdx = 0; renderTrace();
+  });
+  document.getElementById("traceNext").addEventListener("click", function(){
+    if (traceIdx < STEPS.length - 1) { traceIdx++; renderTrace(); }
+  });
+  document.getElementById("tracePrev").addEventListener("click", function(){
+    if (traceIdx > 0) { traceIdx--; renderTrace(); }
+  });
+  document.getElementById("traceReset").addEventListener("click", function(){
+    traceIdx = -1;
+    document.getElementById("tracePrev").disabled = true;
+    document.getElementById("traceNext").disabled = true;
+    document.getElementById("traceReset").disabled = true;
+    clearClasses();
+    document.getElementById("detail").innerHTML =
+      '<div class="ph">节点详情</div><h3>先点左边的任一个节点</h3>' +
+      '<div class="tagline">这张图只画了专利里真正出现的因果关系。</div>';
+  });
+
+  /* default: nothing selected, show the whole network */
+})();
+</script>
+</body>
+</html>

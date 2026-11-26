@@ -1,0 +1,169 @@
+# 迁移验收规格（唯一来源）
+#
+# 为什么是 TOML 不是 YAML：本机 Python 3.12 自带的 tomllib 可直接解析 TOML，
+# 而 PyYAML 因网络不可达装不上（pip 拿不到包）。验收规格必须"零依赖可判"，
+# 所以选 TOML。判卷脚本：tools/check_spec.py
+#
+# 用法：
+#   python tools/check_spec.py --check-spec          # 检查规格与证据齐不齐（缺项退出非零）
+#   python tools/check_spec.py --judge <results.json> # 用实测结果判 pass/fail
+#   python tools/check_spec.py --selftest            # 自测判卷逻辑
+
+[meta]
+version = 1
+date = "2026-11-25"
+design = "OPA_D"
+source_pdk = "smic18ee_2P6M_20100810"
+# 2026-11-25 修订（ADR 0001 r1）：目标 PDK 由 smic18mmrf 改为 13mmrf。
+# 理由：smic18mmrf 只在 Windows 工程里、未确认能挂进 Virtuoso VM；13mmrf 在 VM 内齐全（含 Calibre）。
+# 代价：180→130 属跨节点，头寸要重排，供电方案（1.8V IO 器件 vs 降 1.2V 核心）待定。
+target_pdk_primary = "PDK_13mmrf_1P6M_30k"   # 目标器件：n33/p33（3.3V IO）@ 1.8V；不是 n12/p12 core
+target_pdk_fallback = "smic18mmrf（仅当 13mmrf 不可用；需先解决 VM 挂载）"
+vdd_nominal_v = 1.8  # 2026-11-25 决策 B：保 1.8V，用 3.3V IO 器件 n33/p33 @ 1.8V
+# 源基线：必须由工单 04 的 run 生成，禁止抄交付文档
+source_baseline_run = "runs/2026-11-25-source-baseline/result.json"
+# 目标设计：工单 08 产出
+target_result_run = "runs/TBD-resize/result.json"
+note = "任何数字结论都要能追到 runs/ 里的一次可重跑实验；缺失即判未通过。"
+
+[scope]
+# 五层里本轮覆盖的层
+layers_covered = ["L1_topology_op", "L2_erc", "L3_metrics", "L4_pvt_mc"]
+# 显式不覆盖的层（不得混入 pass）
+layers_out_of_scope = ["L2_drc", "L2_lvs", "L5_pex"]
+out_of_scope_reason = "本轮无版图；DRC/LVS/PEX 属后续独立项目，只保留接入接口。"
+
+# ---------------------------------------------------------------- 指标
+# direction: min = 越大越好（下限约束）；max = 越小越好（上限约束）
+# status: active = 本轮判卷；todo = 测试台暂不具备，只登记不判
+# allowed_relative_degradation: 相对源基线允许劣化的比例（0.05 = 5%）
+
+[[metrics]]
+name = "gain"
+unit = "dB"
+direction = "min"
+allowed_relative_degradation = 0.05
+abs_min = 60.0
+status = "active"
+evidence = "ac 开环增益（tt/27C，与源基线同一测试台）"
+
+[[metrics]]
+name = "gbw"
+unit = "MHz"
+direction = "min"
+allowed_relative_degradation = 0.05
+abs_min = 10.0
+status = "active"
+evidence = "ac 单位增益带宽（同一负载与补偿网络）"
+
+[[metrics]]
+name = "pm"
+unit = "deg"
+direction = "min"
+allowed_relative_degradation = 0.05
+abs_min = 60.0
+status = "active"
+evidence = "ac 相位裕度（开环，含负载电容）"
+
+[[metrics]]
+name = "srp"
+unit = "V/us"
+direction = "min"
+allowed_relative_degradation = 0.05
+abs_min = 10.0
+status = "active"
+evidence = "瞬态大信号上升压摆率（同一激励幅度）"
+
+[[metrics]]
+name = "srm"
+unit = "V/us"
+direction = "min"
+allowed_relative_degradation = 0.05
+abs_min = 10.0
+status = "active"
+evidence = "瞬态大信号下降压摆率（同一激励幅度）"
+
+[[metrics]]
+name = "power"
+unit = "uW"
+direction = "max"
+allowed_relative_degradation = 0.05
+abs_max = 1000.0
+status = "active"
+evidence = "静态功耗（全电源电流 × 供电，标称工况）"
+
+[[metrics]]
+name = "offset"
+unit = "mV"
+direction = "max"
+allowed_relative_degradation = 0.10
+status = "todo"
+evidence = "输入失调（DC 扫描，需先确定测试台）"
+
+[[metrics]]
+name = "cmrr"
+unit = "dB"
+direction = "min"
+allowed_relative_degradation = 0.10
+status = "todo"
+evidence = "共模抑制比（共模扫描，需先确定口径）"
+
+[[metrics]]
+name = "psrr"
+unit = "dB"
+direction = "min"
+allowed_relative_degradation = 0.10
+status = "todo"
+evidence = "电源抑制比（电源小信号注入）"
+
+[[metrics]]
+name = "noise"
+unit = "nV/sqrtHz"
+direction = "max"
+allowed_relative_degradation = 0.10
+status = "todo"
+evidence = "输入参考噪声（指定频点与带宽）"
+
+# ---------------------------------------------------------------- 角集
+[corners]
+# 语义角集：上游 45 点 = 5 process × 3 voltage × 3 temp
+process = ["tt", "ss", "ff", "fnsp", "snfp"]
+# 相对标称供电的缩放：1.8V → 1.62 / 1.80 / 1.98；1.2V → 1.08 / 1.20 / 1.32
+# 用户给定的最低目标（2026-11-25）：CL 5pF，增益≥60dB，UGF≥10MHz，PM≥60°，SR±≥10V/µs，功耗≤1mW
+# 这些 abs_min/abs_max 是硬下限/上限，与"相对源基线不劣化"并行判定
+# 目标为 13mmrf n33/p33 @ 1.8V（见 [meta].vdd_nominal_v）
+voltage_scale = [0.9, 1.0, 1.1]
+temp_c = [-40.0, 27.0, 125.0]
+points_expected = 45
+nominal = "tt/1.0/27"
+
+# 目标 PDK 的角名映射（工单 05 填；未填 = 角集未就绪）
+[corners.pdk_map]
+# "PDK_13mmrf_1P6M_30k" = { tt = "TT", ss = "SS", ff = "FF", fnsp = "FNSP", snfp = "SNFP" }
+
+# ---------------------------------------------------------------- 统计
+[statistics]
+monte_carlo_samples = 300
+yield_target = 0.95
+wcd_required = false
+note = "蒙卡或最坏情况距离（WCD）至少实现一个；两者都缺则 L4 判未通过。"
+
+# ---------------------------------------------------------------- 判卷规则
+[judging]
+missing_evidence_is_failure = true
+out_of_scope_never_passes = true
+fail_on_any_active_metric = true
+require_all_corners = true
+require_target_netlist = true
+
+# ---------------------------------------------------------------- 证据清单
+# 每个条目：路径必须存在才算"证据齐"；由 check_spec.py --check-spec 检查
+[evidence]
+source_netlist = "netlists/source/opa_d.sp"
+source_baseline = "runs/2026-11-25-source-baseline/result.json"
+device_map = "netlists/mapping/device-map-v0.toml"
+target_netlist = "netlists/target/opa_d_v0.sp"
+porting_log = "runs/TBD-porting-v0/README.md"
+resized_netlist = "netlists/target/opa_d_v1.sp"
+pvt_results = "runs/TBD-verification/pvt.json"
+verification_report = "docs/reports/verification-TBD.md"
