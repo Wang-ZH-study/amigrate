@@ -438,8 +438,9 @@ def main() -> int:
     port = 8800
     if port_in_use(port):
         print(f"端口 {port} 已有服务在运行，直接打开页面。")
+        import webbrowser
         try:
-            subprocess.run(["cmd", "/c", "start", "", f"http://127.0.0.1:{port}"], timeout=5)
+            webbrowser.open(f"http://127.0.0.1:{port}")
         except Exception:  # noqa: BLE001
             pass
         return 0
