@@ -1,10 +1,7 @@
-# 图标素材来源（CC0）
+﻿# 图标素材来源
 
-- 文件：`assets/chip-source.jpg`（原图）、`assets/icon.png`（裁剪预览）、`assets/icon.ico`（多尺寸图标）
-- 原图：Pixnio 免费图库 "Chip, Computer, Teil"
-  - 作者：Paolo Neo
-  - 来源：https://pixnio.com/objects/electronics-devices/computer-components-pictures/chip-computer-part
-  - 许可：**CC0 / Public Domain**（可商用、无需署名；此处仍保留来源说明）
-- 处理：居中裁剪至 QFP 芯片主体、旋转 180°、轻微提升对比度与饱和度，导出 16–256px 多尺寸 ICO。
+- 文件：`assets/icon.png`（512×512 透明背景）、`assets/icon.ico`（16–256px 多尺寸）
+- 来源：用户提供（`F:\软件图标.jpg`，黄色卡通图标），按用户要求去黑底、裁边、缩放。
+- 版权状态：素材由用户提供，仓库内仅作本工具图标使用；若对外开源请确认该素材的再分发许可。
 
-> 该素材本身为 CC0，不构成版权障碍；如替换为其它图源，请同步更新本文件并确认许可允许再分发。
+> 处理方式：按最亮通道做软阈值抠除纯黑背景，MinFilter 收边 1px + 高斯羽化，裁到内容后居中方形画布、4% 留白。

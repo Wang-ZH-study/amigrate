@@ -39,7 +39,7 @@ class App(tk.Tk):
         self.geometry("980x720")
         self.configure(bg="#f6f8fb")
         try:
-            self.iconbitmap(str(ROOT / "assets" / "icon.ico"))
+            self.iconbitmap(str(ROOT / "assets" / "amigrate-icon.ico"))
         except Exception:  # noqa: BLE001
             pass
         self._build()
