@@ -30,6 +30,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 SSH = "ic618"
 VM_HOME = "/home/IC"
+CREATE_NO_WINDOW = 0x08000000
+SUBKW = {"creationflags": CREATE_NO_WINDOW} if os.name == "nt" else {}
 SKILL = ROOT / "skill"
 PY = sys.executable
 WEB_RUNS = ROOT / "runs" / "2026-11-26-webui"
@@ -41,7 +43,7 @@ def ssh(cmd: str, timeout: int = 30) -> tuple[int, str]:
     try:
         p = subprocess.run(["ssh", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=8",
                             "-o", "BatchMode=yes", SSH, cmd],
-                           capture_output=True, text=True, timeout=timeout)
+                           capture_output=True, text=True, timeout=timeout, **SUBKW)
         out = p.stdout or ""
         if p.returncode != 0:
             out += p.stderr or ""
@@ -98,7 +100,7 @@ def set_stage(name: str, pct: int) -> None:
 
 
 def run_local(args: list[str], timeout: int = 900) -> tuple[int, str]:
-    p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+    p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=timeout, **SUBKW)
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
@@ -155,7 +157,7 @@ def run_skill(script: str, timeout: int = 240) -> tuple[int, str]:
     if not local.exists():
         return 1, f"脚本不存在：{local}"
     subprocess.run(["scp", str(local), f"{SSH}:/tmp/{script}"],
-                   capture_output=True, text=True, timeout=60)
+                   capture_output=True, text=True, timeout=60, **SUBKW)
     cmd = (f"cd /tmp && sed -i '1s/^\\xEF\\xBB\\xBF//' {script}; sed -i 's/\\r$//' {script}; "
            f"cd {VM_HOME} && timeout {timeout} virtuoso -nograph < /tmp/{script} > /tmp/{script}.log 2>&1; "
            f"echo EXIT=$?; tail -6 /tmp/{script}.log")
@@ -181,7 +183,7 @@ def job_pvt(_params: dict) -> None:
         for src, dst in [(ROOT / "runs/2026-11-25-pvt/nets", "/tmp/pvt/"),
                          (ROOT / "runs/2026-11-25-pvt/run_pvt.sh", "/tmp/pvt/")]:
             p = subprocess.run(["scp", "-r", str(src), f"{SSH}:{dst}"],
-                               capture_output=True, text=True, timeout=300)
+                               capture_output=True, text=True, timeout=300, **SUBKW)
             if p.returncode != 0:
                 raise RuntimeError(f"scp 失败：{p.stderr}")
         ssh("sed -i 's/\\r$//' /tmp/pvt/run_pvt.sh")
@@ -196,7 +198,7 @@ def job_pvt(_params: dict) -> None:
         rc, out = ssh("cd /tmp/pvt && tar czf /tmp/pvt_raw.tgz raw", timeout=180)
         tgz = out_dir / "pvt_raw.tgz"
         p = subprocess.run(["scp", f"{SSH}:/tmp/pvt_raw.tgz", str(tgz)],
-                           capture_output=True, text=True, timeout=300)
+                           capture_output=True, text=True, timeout=300, **SUBKW)
         if p.returncode != 0:
             raise RuntimeError(f"回传失败：{p.stderr}")
         with tarfile.open(tgz) as tf:
