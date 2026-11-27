@@ -1,0 +1,80 @@
+# 实验产物与二进制不入库
+runs/**
+!runs/.gitkeep
+!runs/*/
+!runs/*/README.md
+!runs/*/*.md
+!runs/*/*.csv
+!runs/*/*.json
+
+# 大文件/二进制
+*.gds
+*.oas
+*.vmdk
+*.vmx
+*.ova
+*.iso
+*.zip
+*.7z
+*.rar
+*.psf
+*.raw
+*.tr0
+*.tran
+*.ac
+
+# 波形与缓存
+*.wave
+*.fsdb
+*.vcd
+*.wlf
+__pycache__/
+*.pyc
+
+# 凭据
+.env
+*.credentials*
+*.pem
+id_rsa
+id_eda
+
+# 编辑器
+.vscode/
+.idea/
+~$*
+
+# PDK 副本（只保留路径记录）
+pdk/
+PDK/
+models/
+
+# 调研临时文件（下载的 PDF、解包脚本）
+research/_tmp/
+
+# 第三方 SKILL 脚本原件（Cadence 版权，本地使用不转发）
+research/attachments/
+
+# 论文 PDF（版权 + 体积；只提交 papers/README.md）
+papers/*.pdf
+papers/_download.log
+
+# PDF 抽文工作区（抽出的 txt、校验脚本、截图；可随时重跑，不入库）
+.scratch/pdftext/
+
+# 本地 git 操作临时文件
+.git-commit-msg.txt
+.commit-out.txt
+.git-state.txt
+.*.txt
+# ---- 上传 GitHub 前排除：PDK 派生数据与原始仿真 ----
+runs/*/raw/
+runs/*/*.tgz
+runs/**/nets/
+*.psf
+*.psfascii
+*.log
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
