@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """amigrate Web UI —— 本地网页版迁移向导（Python 标准库，无第三方依赖）。
 
@@ -239,7 +239,71 @@ def job_pvt(_params: dict) -> None:
         job_log(f"❌ 失败：{e}")
 
 
-WORKERS = {"convert": job_convert, "pvt": job_pvt}
+def job_generic(params: dict) -> None:
+    """通用迁移：发现 PDK → 建表 → 源约束 → 反解 → SKILL 脚本（流式进度）。"""
+    try:
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        out_dir = WEB_RUNS / f"generic-{ts}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        job_log(f"输出目录：{out_dir}")
+        cmd = [PY, "tools/generic_flow.py",
+               "--src-lib", params.get("src_lib", "weekfour_last"),
+               "--src-cell", params.get("src_cell", "OPA_D"),
+               "--src-net", params.get("src_net", "runs/2026-11-25-io18-ac/src_net.scs"),
+               "--tgt-pdk", params.get("tgt_pdk", "PDK_13mmrf_1P6M_30k"),
+               "--out", str(out_dir)]
+        if params.get("n_dev"):
+            cmd += ["--n-dev", params["n_dev"]]
+        if params.get("p_dev"):
+            cmd += ["--p-dev", params["p_dev"]]
+        if params.get("quick"):
+            cfg = ROOT / "runs/2026-11-27-generic/discover/PDK_13mmrf_1P6M_30k.json"
+            lut = ROOT / "runs/2026-11-27-generic/lut-pilot/lut_PDK_13mmrf_1P6M_30k.csv"
+            cons = ROOT / "runs/2026-11-27-generic/constraints/constraints.csv"
+            if cfg.exists():
+                cmd += ["--cfg", str(cfg)]
+            if lut.exists():
+                cmd += ["--lut", str(lut)]
+            if cons.exists():
+                cmd += ["--constraints", str(cons)]
+
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                errors="replace", **SUBKW)
+        for line in proc.stdout:
+            line = line.rstrip()
+            if not line:
+                continue
+            job_log(line)
+            m = re.match(r"STAGE (\d+)/5", line)
+            if m:
+                i = int(m.group(1))
+                set_stage(f"阶段 {i}/5", 10 + i * 17)
+        rc = proc.wait()
+        if rc != 0:
+            raise RuntimeError(f"generic_flow 退出码 {rc}")
+        files = sorted(p.name for p in out_dir.iterdir())
+        summary = {}
+        sj = out_dir / "summary.json"
+        if sj.exists():
+            summary = json.loads(sj.read_text(encoding="utf-8"))
+        set_stage("完成", 100)
+        with STATE["lock"]:
+            STATE["job"]["status"] = "done"
+            STATE["job"]["result"] = {
+                "kind": "generic", "out_dir": str(out_dir), "files": files,
+                "sizes": summary.get("sizes"), "skill": summary.get("skill"),
+                "solved": summary.get("solved"),
+                "files_url": [f"/files?path={out_dir.relative_to(ROOT).as_posix()}/{x}" for x in files],
+            }
+        job_log(f"✅ 通用迁移完成：{summary.get('solved', '?')} 个器件")
+    except Exception as e:  # noqa: BLE001
+        with STATE["lock"]:
+            STATE["job"]["status"] = "error"
+        job_log(f"❌ 失败：{e}")
+
+
+WORKERS = {"convert": job_convert, "pvt": job_pvt, "generic": job_generic}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -379,6 +443,20 @@ pre{background:#0f172a;color:#d7e2f1;padding:12px;border-radius:8px;max-height:3
 <span class="muted">生成网表 → VM 跑 Spectre → 回传 → 解析，结果保存到 runs/2026-11-26-webui/pvt-&lt;时间戳&gt;/</span>
 </div>
 
+<div class="card hide" id="gencard"><h2>4. 通用迁移（其他 PDK）</h2>
+<div class="row">
+<div><label>源网表</label><input id="g_net" value="runs/2026-11-25-io18-ac/src_net.scs"></div>
+<div><label>目标 PDK（Tech 目录名）</label><input id="g_pdk" value="PDK_13mmrf_1P6M_30k"></div>
+<div><label>n 器件（可选）</label><input id="g_ndev" placeholder="n33_mis_ckt"></div>
+<div><label>p 器件（可选）</label><input id="g_pdev" placeholder="p33_mis_ckt"></div>
+</div>
+<div style="margin-top:10px">
+<label style="display:inline;color:var(--muted)"><input type="checkbox" id="g_quick" checked style="width:auto"> 快速验证（复用已有 13mmrf 中间结果，跳过建表）</label>
+</div>
+<div style="margin-top:10px"><button id="generic">开始通用迁移</button>
+<span class="muted">发现 PDK → 建表 → 源约束 → 反解尺寸 → 生成 SKILL 脚本</span></div>
+</div>
+
 <div class="card hide" id="logcard"><h2>进度</h2>
 <div class="bar"><i id="bar"></i></div>
 <div class="muted" id="stage">准备中…</div>
@@ -393,7 +471,7 @@ async function env(){ const r=await fetch('/api/env'); const d=await r.json();
   h += '<span class="muted">PDK：'+(d.pdks||[]).join(' / ')+'</span>';
   if(!d.vm||!d.virtuoso) h += '<div style="margin-top:8px" class="muted">请先在 VM 启动 Virtuoso 后点“重新检测”。</div>';
   $('#envline').innerHTML=h;
-  if(d.vm&&d.virtuoso){ $('#form1').classList.remove('hide'); $('#pvtcard').classList.remove('hide'); }
+  if(d.vm&&d.virtuoso){ $('#form1').classList.remove('hide'); $('#pvtcard').classList.remove('hide'); $('#gencard').classList.remove('hide'); }
 }
 $('#retry').onclick=env;
 $('#src_pdk').onchange=e=>{$('#src_custom').style.display=e.target.value==='__custom__'?'flex':'none'};
@@ -414,6 +492,7 @@ $('#start').onclick=()=>start('convert',{src_lib:$('#src_lib').value,src_cell:$(
   src_pdk:$('#src_pdk').value,out_lib:$('#out_lib').value,out_cell:$('#out_cell').value,
   tgt_pdk:$('#tgt_pdk').value});
 $('#pvt').onclick=()=>start('pvt',{});
+$('#generic').onclick=()=>start('generic',{src_net:$('#g_net').value,tgt_pdk:$('#g_pdk').value,n_dev:$('#g_ndev').value,p_dev:$('#g_pdev').value,quick:$('#g_quick').checked});
 async function poll(){ const d=await (await fetch('/api/job')).json();
   $('#bar').style.width=(d.pct||0)+'%';
   $('#stage').textContent=(d.stage||'')+'  '+(d.pct||0)+'%';
