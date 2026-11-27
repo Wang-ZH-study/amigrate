@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """通用化迁移主流程：发现 PDK → 建表 → 源约束 → 反解尺寸 → 生成 SKILL 脚本。
 
@@ -52,6 +52,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--cfg", type=Path, default=None)
     ap.add_argument("--lut", type=Path, default=None)
     ap.add_argument("--constraints", type=Path, default=None)
+    ap.add_argument("--vdd", type=float, default=1.8, help="目标供电电压（V）")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
     out = Path(str(a.out).replace("\\", "/"))
@@ -61,7 +62,8 @@ def main(argv: list[str]) -> int:
     # 1. 发现 PDK
     if a.cfg is None:
         print("STAGE 1/5 发现目标 PDK", flush=True)
-        args = ["tools/pdk_discover.py", "--pdk", a.tgt_pdk, "--out", str(out / "discover")]
+        args = ["tools/pdk_discover.py", "--pdk", a.tgt_pdk, "--out", str(out / "discover"),
+                "--vdd", str(a.vdd)]
         if a.n_dev and a.p_dev:
             args += ["--devs", a.n_dev, a.p_dev]
         rc, _ = run(args)
@@ -71,7 +73,9 @@ def main(argv: list[str]) -> int:
         a.cfg = out / "discover" / f"{a.tgt_pdk}.json"
 
     cfg = json.loads(a.cfg.read_text(encoding="utf-8"))
-    print(f"   器件：{cfg['devs']}，角：{cfg.get('corner')}", flush=True)
+    if abs(float(cfg.get("vdd", 1.8)) - a.vdd) > 1e-9:
+        print(f"⚠ 复用已有配置的 VDD={cfg.get('vdd')}V，--vdd={a.vdd} 未生效；改电压请重新发现/建表", flush=True)
+    print(f"   器件：{cfg['devs']}，角：{cfg.get('corner')}，VDD：{cfg.get('vdd')}V", flush=True)
 
     # 2. 器件表
     if a.lut is None:
@@ -109,6 +113,7 @@ def main(argv: list[str]) -> int:
         "src": f"{a.src_lib}/{a.src_cell}",
         "src_net": str(a.src_net),
         "tgt_pdk": a.tgt_pdk,
+        "vdd": cfg.get("vdd", a.vdd),
         "cfg": str(a.cfg),
         "lut": str(a.lut),
         "constraints": str(a.constraints),

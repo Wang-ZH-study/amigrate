@@ -42,3 +42,22 @@
 3. **R/C 映射**：当前 conv.config 只处理 MOS；源图用 analogLib 理想 R/C，暂不影响仿真；版图级需补 `rhrpo/mim2_tm`。
 4. **SKILL 未自动执行**：`generic_convert.il` 已生成，但网页流程停在"生成脚本"；下一步接 `wscript`/`virtuoso -nograph` 跑它并回读校验。
 5. 建表网格/工艺角参数化（目前默认 tt + 少量 Vds/Vsb）。
+## 5. VDD 可配置（2026-11-27）
+
+**为什么需要**：目标 PDK 的电压域不固定（1.2V 核心 / 1.8V / 2.5V / 3.3V IO），VDD 会影响：
+
+- 器件表里 p 管的 VDD 参考（`VDD-VDS`、`VDD-VGS`）；
+- Vgs 扫描上限：`vgs_max = min(器件耐压, VDD)`；
+- 后续验证网表的供电（PVT/AC 需同值）。
+
+**怎么用**：
+
+- CLI：`pdk_discover.py --vdd 1.2`、`generic_flow.py --vdd 1.2`；
+- 网页版第 4 节：勾选「自定义 VDD」并填值（默认 1.8V，不勾则用 1.8V）；
+- 桌面工具后续同步同样入口。
+
+**注意**：
+
+- VDD 改变后必须**重新发现 + 重新建表**；"快速验证"复用旧表时 VDD 不生效，流程会打印警告；
+- 源设计的偏置约束（Id/gm/Aint）来自源网表，不随目标 VDD 变化；改 VDD 只改目标器件表与验证环境；
+- 若 VDD 低于器件阈值/饱和余量，F0–F4 的电压余量判据会直接报不可行。

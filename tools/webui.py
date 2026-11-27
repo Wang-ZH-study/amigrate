@@ -256,6 +256,8 @@ def job_generic(params: dict) -> None:
             cmd += ["--n-dev", params["n_dev"]]
         if params.get("p_dev"):
             cmd += ["--p-dev", params["p_dev"]]
+        if params.get("vdd") is not None:
+            cmd += ["--vdd", str(params["vdd"])]
         if params.get("quick"):
             cfg = ROOT / "runs/2026-11-27-generic/discover/PDK_13mmrf_1P6M_30k.json"
             lut = ROOT / "runs/2026-11-27-generic/lut-pilot/lut_PDK_13mmrf_1P6M_30k.csv"
@@ -449,9 +451,11 @@ pre{background:#0f172a;color:#d7e2f1;padding:12px;border-radius:8px;max-height:3
 <div><label>目标 PDK（Tech 目录名）</label><input id="g_pdk" value="PDK_13mmrf_1P6M_30k"></div>
 <div><label>n 器件（可选）</label><input id="g_ndev" placeholder="n33_mis_ckt"></div>
 <div><label>p 器件（可选）</label><input id="g_pdev" placeholder="p33_mis_ckt"></div>
+<div><label>目标 VDD（V）</label><input id="g_vdd" value="1.8" disabled></div>
 </div>
 <div style="margin-top:10px">
-<label style="display:inline;color:var(--muted)"><input type="checkbox" id="g_quick" checked style="width:auto"> 快速验证（复用已有 13mmrf 中间结果，跳过建表）</label>
+<label style="display:inline;color:var(--muted)"><input type="checkbox" id="g_vdd_en" style="width:auto" onchange="document.getElementById('g_vdd').disabled=!this.checked"> 自定义 VDD（默认 1.8V）</label>
+<label style="display:inline;color:var(--muted);margin-left:18px"><input type="checkbox" id="g_quick" checked style="width:auto"> 快速验证（复用已有 13mmrf 中间结果，跳过建表）</label>
 </div>
 <div style="margin-top:10px"><button id="generic">开始通用迁移</button>
 <span class="muted">发现 PDK → 建表 → 源约束 → 反解尺寸 → 生成 SKILL 脚本</span></div>
@@ -492,7 +496,7 @@ $('#start').onclick=()=>start('convert',{src_lib:$('#src_lib').value,src_cell:$(
   src_pdk:$('#src_pdk').value,out_lib:$('#out_lib').value,out_cell:$('#out_cell').value,
   tgt_pdk:$('#tgt_pdk').value});
 $('#pvt').onclick=()=>start('pvt',{});
-$('#generic').onclick=()=>start('generic',{src_net:$('#g_net').value,tgt_pdk:$('#g_pdk').value,n_dev:$('#g_ndev').value,p_dev:$('#g_pdev').value,quick:$('#g_quick').checked});
+$('#generic').onclick=()=>start('generic',{src_net:$('#g_net').value,tgt_pdk:$('#g_pdk').value,n_dev:$('#g_ndev').value,p_dev:$('#g_pdev').value,quick:$('#g_quick').checked,vdd: $('#g_vdd_en').checked ? parseFloat($('#g_vdd').value) : null});
 async function poll(){ const d=await (await fetch('/api/job')).json();
   $('#bar').style.width=(d.pct||0)+'%';
   $('#stage').textContent=(d.stage||'')+'  '+(d.pct||0)+'%';

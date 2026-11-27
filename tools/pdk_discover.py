@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """PDK 发现：扫描 VM 上的任意 PDK，产出通用 LUT 构建配置（JSON）。
 
@@ -139,6 +139,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--pdk", required=True)
     ap.add_argument("--root", default=None)
     ap.add_argument("--corner", default="tt")
+    ap.add_argument("--vdd", type=float, default=1.8, help="目标供电电压（V），决定 Vgs 扫描上限")
     ap.add_argument("--devs", nargs=2, metavar=("N_DEV", "P_DEV"), default=None,
                     help="手工指定 n/p 器件名（如 n33_mis_ckt p33_mis_ckt）")
     ap.add_argument("--out", type=Path)
@@ -213,8 +214,8 @@ def main(argv: list[str]) -> int:
         "corners": corners,
         "devs": devs,
         "device_candidates": all_mos,
-        "vdd": 1.8,
-        "vgs_max": min(infer_voltage(devs.get("n", "n18")), 1.8),
+        "vdd": a.vdd,
+        "vgs_max": min(infer_voltage(devs.get("n", "n18")), a.vdd),
         "Ls": [0.5, 1.0, 2.0],
         "vds": [0.3, 0.9],
         "vsb": [0.0, 0.3],
